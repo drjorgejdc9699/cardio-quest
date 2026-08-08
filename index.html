@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>PULSO · Entrenador de Cardiología ENARM</title>
+</head>
+<body>
+<style>
+  :root{
+    --bg:#fdf5f3;
+    --bg-panel:#fffaf9;
+    --bg-panel-2:#fbeae7;
+    --grid: rgba(138,31,58,0.10);
+    --grid-bold: rgba(138,31,58,0.16);
+    --accent:#8a1f3a;
+    --accent-dim:#c98a97;
+    --accent-soft: rgba(138,31,58,0.12);
+    --ink:#2a1418;
+    --ink-muted:#8a6067;
+    --success:#217a45;
+    --success-soft: rgba(33,122,69,0.14);
+    --danger:#c0293f;
+    --danger-soft: rgba(192,41,63,0.14);
+    --amber:#9a6412;
+    --amber-soft: rgba(154,100,18,0.14);
+    --border: rgba(138,31,58,0.28);
+    --shadow: 0 18px 40px -20px rgba(42,20,24,0.35);
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Consolas, monospace;
+    --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --sans: -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#060f0d;
+      --bg-panel:#0c1a17;
+      --bg-panel-2:#0a1512;
+      --grid: rgba(53,224,161,0.08);
+      --grid-bold: rgba(53,224,161,0.14);
+      --accent:#35e0a1;
+      --accent-dim:#1c8f68;
+      --accent-soft: rgba(53,224,161,0.14);
+      --ink:#eafff5;
+      --ink-muted:#7fa89a;
+      --success:#35e0a1;
+      --success-soft: rgba(53,224,161,0.14);
+      --danger:#ff5468;
+      --danger-soft: rgba(255,84,104,0.16);
+      --amber:#ffb238;
+      --amber-soft: rgba(255,178,56,0.16);
+      --border: rgba(53,224,161,0.25);
+      --shadow: 0 18px 44px -20px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#fdf5f3; --bg-panel:#fffaf9; --bg-panel-2:#fbeae7;
+    --grid: rgba(138,31,58,0.10); --grid-bold: rgba(138,31,58,0.16);
+    --accent:#8a1f3a; --accent-dim:#c98a97; --accent-soft: rgba(138,31,58,0.12);
+    --ink:#2a1418; --ink-muted:#8a6067;
+    --success:#217a45; --success-soft: rgba(33,122,69,0.14);
+    --danger:#c0293f; --danger-soft: rgba(192,41,63,0.14);
+    --amber:#9a6412; --amber-soft: rgba(154,100,18,0.14);
+    --border: rgba(138,31,58,0.28); --shadow: 0 18px 40px -20px rgba(42,20,24,0.35);
+  }
+  :root[data-theme="dark"]{
+    --bg:#060f0d; --bg-panel:#0c1a17; --bg-panel-2:#0a1512;
+    --grid: rgba(53,224,161,0.08); --grid-bold: rgba(53,224,161,0.14);
+    --accent:#35e0a1; --accent-dim:#1c8f68; --accent-soft: rgba(53,224,161,0.14);
+    --ink:#eafff5; --ink-muted:#7fa89a;
+    --success:#35e0a1; --success-soft: rgba(53,224,161,0.14);
+    --danger:#ff5468; --danger-soft: rgba(255,84,104,0.16);
+    --amber:#ffb238; --amber-soft: rgba(255,178,56,0.16);
+    --border: rgba(53,224,161,0.25); --shadow: 0 18px 44px -20px rgba(0,0,0,0.6);
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--sans);
+    display:flex;
+    justify-content:center;
+    align-items:flex-start;
+    min-height:100vh;
+    padding:20px 14px 60px;
+  }
+  button{ font-family:inherit; }
+  ::selection{ background:var(--accent-soft); }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  .monitor{
+    width:100%;
+    max-width:760px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    position:relative;
+    overflow:hidden;
+  }
+  .paper{
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+      linear-gradient(var(--grid-bold) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-bold) 1px, transparent 1px);
+    background-size: 8px 8px, 8px 8px, 40px 40px, 40px 40px;
+    background-position: -1px -1px;
+  }
+
+  .ecg-wrap{ position:relative; height:88px; border-bottom:1px solid var(--border); background:var(--bg-panel-2); }
+  #ecg{ display:block; width:100%; height:100%; }
+  .ecg-label{
+    position:absolute; top:8px; left:12px; font-family:var(--mono); font-size:10px;
+    letter-spacing:.12em; color:var(--ink-muted); text-transform:uppercase;
+  }
+
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; border-bottom:1px solid var(--border);
+  }
+  .brand{ display:flex; flex-direction:column; line-height:1.05; }
+  .brand-mark{ font-family:var(--mono); font-weight:700; font-size:19px; letter-spacing:.06em; color:var(--accent); }
+  .brand-sub{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--ink-muted); text-transform:uppercase; margin-top:3px; }
+  .topbar-stats{ display:flex; gap:8px; }
+  .chip{
+    display:flex; align-items:center; gap:6px; border:1px solid var(--border);
+    padding:5px 10px; font-family:var(--mono); font-size:12px; color:var(--ink-muted);
+    background:var(--bg-panel-2);
+  }
+  .chip b{ color:var(--ink); font-variant-numeric:tabular-nums; font-weight:700; }
+
+  .app{ padding:18px 16px 22px; }
+
+  h1,h2,h3{ font-family:var(--serif); text-wrap:balance; margin:0 0 6px; }
+  .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 8px; }
+  p{ margin:0 0 10px; }
+  .muted{ color:var(--ink-muted); }
+
+  .btn{
+    border:1px solid var(--border); background:var(--bg-panel-2); color:var(--ink);
+    padding:12px 18px; font-family:var(--mono); font-size:13px; letter-spacing:.04em;
+    text-transform:uppercase; cursor:pointer; transition:transform .06s ease, background .15s ease;
+  }
+  .btn:hover{ background:var(--accent-soft); }
+  .btn:active{ transform:translateY(1px); }
+  .btn-primary{ background:var(--accent); color:var(--bg-panel); border-color:var(--accent); font-weight:700; }
+  .btn-primary:hover{ background:var(--accent); filter:brightness(1.08); }
+  .btn-block{ width:100%; }
+  .btn-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .btn[disabled]{ opacity:.45; cursor:default; pointer-events:none; }
+
+  .section{ margin-bottom:22px; }
+  .card-panel{
+    border:1px solid var(--border); background:var(--bg-panel-2); padding:16px;
+  }
+
+  .topics-grid{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 16px; }
+  .topic-chip{
+    border:1px solid var(--border); padding:7px 12px; font-family:var(--mono); font-size:11.5px;
+    letter-spacing:.03em; cursor:pointer; background:var(--bg-panel-2); color:var(--ink-muted);
+    display:flex; align-items:center; gap:6px;
+  }
+  .topic-chip.active{ background:var(--accent); color:var(--bg-panel); border-color:var(--accent); }
+  .topic-chip .n{ font-variant-numeric:tabular-nums; opacity:.8; }
+
+  .stat-row{ display:flex; gap:10px; flex-wrap:wrap; margin:14px 0; }
+  .stat-box{ flex:1 1 120px; border:1px solid var(--border); padding:10px 12px; background:var(--bg-panel-2); }
+  .stat-box .k{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-muted); }
+  .stat-box .v{ font-family:var(--mono); font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
+
+  .run-hud{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border:1px solid var(--border); background:var(--bg-panel-2); padding:10px 12px; margin-bottom:14px;
+    flex-wrap:wrap;
+  }
+  .hearts{ display:flex; gap:4px; font-size:16px; letter-spacing:1px; }
+  .heart-lost{ opacity:.25; }
+  .hud-mono{ font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums; }
+  .combo-badge{
+    font-family:var(--mono); font-size:12px; padding:3px 8px; border:1px solid var(--amber);
+    color:var(--amber); background:var(--amber-soft); font-weight:700;
+  }
+  .timer-wrap{ flex:1 1 100%; order:5; }
+  .timer-bar-bg{ height:5px; background:var(--border); width:100%; margin-top:8px; }
+  .timer-bar{ height:100%; background:var(--accent); width:100%; transition:width .1s linear, background .2s ease; }
+
+  .vignette-topic{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .diff-dots span{ display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--border); margin-left:3px; }
+  .diff-dots span.on{ background:var(--accent); }
+  .vignette{ font-family:var(--serif); font-size:17px; line-height:1.55; max-width:65ch; }
+
+  .options{ display:flex; flex-direction:column; gap:8px; margin-top:14px; }
+  .option{
+    text-align:left; border:1px solid var(--border); background:var(--bg-panel); color:var(--ink);
+    padding:11px 13px; font-family:var(--sans); font-size:14.5px; cursor:pointer; display:flex; gap:10px;
+  }
+  .option:hover{ background:var(--accent-soft); }
+  .option .letter{ font-family:var(--mono); color:var(--ink-muted); font-weight:700; }
+  .option.correct{ background:var(--success-soft); border-color:var(--success); }
+  .option.wrong{ background:var(--danger-soft); border-color:var(--danger); }
+  .option.dim{ opacity:.55; }
+
+  .feedback{ margin-top:14px; padding:14px; border:1px solid var(--border); background:var(--bg-panel-2); }
+  .feedback .verdict{ font-family:var(--mono); font-weight:700; letter-spacing:.08em; text-transform:uppercase; font-size:13px; margin-bottom:6px; }
+  .feedback.ok .verdict{ color:var(--success); }
+  .feedback.bad .verdict{ color:var(--danger); }
+  .feedback .exp{ font-size:14px; line-height:1.5; color:var(--ink); }
+
+  .topic-bar-row{ display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border); }
+  .topic-bar-row:last-child{ border-bottom:none; }
+  .topic-bar-name{ width:150px; font-size:12.5px; flex-shrink:0; }
+  .topic-bar-track{ flex:1; height:10px; background:var(--border); display:flex; overflow:hidden; }
+  .topic-bar-fill.mature{ background:var(--success); }
+  .topic-bar-fill.learning{ background:var(--amber); }
+  .topic-bar-fill.newf{ background:var(--accent-dim); }
+  .topic-bar-count{ font-family:var(--mono); font-size:11px; color:var(--ink-muted); width:52px; text-align:right; flex-shrink:0; }
+
+  .legend{ display:flex; gap:14px; font-family:var(--mono); font-size:11px; color:var(--ink-muted); margin-top:10px; flex-wrap:wrap; }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .legend i{ width:8px; height:8px; display:inline-block; }
+
+  .toast{
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    background:var(--accent); color:var(--bg-panel); font-family:var(--mono); font-size:12px;
+    padding:8px 14px; letter-spacing:.05em; box-shadow:var(--shadow); z-index:50; opacity:0;
+    transition:opacity .25s ease, transform .25s ease; pointer-events:none;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(4px); }
+
+  .footer-link{ font-family:var(--mono); font-size:11px; color:var(--ink-muted); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; }
+
+  @media (prefers-reduced-motion: reduce){
+    .timer-bar{ transition:none; }
+  }
+</style>
+
+<div class="monitor paper">
+  <div class="ecg-wrap">
+    <span class="ecg-label">PULSO</span>
+    <canvas id="ecg"></canvas>
+  </div>
+  <div id="topbar"></div>
+  <div id="app" class="app"></div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+/* ------------------------------------------------------------------
+   BANCO DE PREGUNTAS
+   Para agregar preguntas propias: añade un objeto al arreglo QUESTIONS
+   con la misma forma { id, topic, diff (1-3), vignette, options[4],
+   correct (indice 0-3), exp }. El "topic" debe coincidir con un id
+   de TOPICS. No hace falta tocar nada más del archivo.
+------------------------------------------------------------------- */
+const TOPICS = [
+  { id:'arritmias',    name:'Arritmias',              glyph:'♥' },
+  { id:'isquemica',    name:'Cardiopatía isquémica',  glyph:'⚡' },
+  { id:'ic',           name:'Insuficiencia cardiaca', glyph:'≈' },
+  { id:'valvular',     name:'Valvulopatías',          glyph:'○' },
+  { id:'has',          name:'Hipertensión arterial',  glyph:'↑' },
+  { id:'congenitas',   name:'Cardiopatías congénitas',glyph:'✦' },
+  { id:'endocarditis', name:'Endocarditis',           glyph:'☀' },
+  { id:'pericardio',   name:'Pericardio',             glyph:'◯' },
+  { id:'reumatica',    name:'Fiebre reumática',       glyph:'♨' },
+  { id:'shock',        name:'Shock cardiogénico',     glyph:'☇' },
+  { id:'miocardio',    name:'Miocardiopatías',        glyph:'◈' },
+  { id:'ecg',          name:'ECG básico',             glyph:'∿' },
+];
+
+const QUESTIONS = [
+  // ARRITMIAS
+  { id:'arr-1', topic:'arritmias', diff:2, vignette:'Mujer de 68 años con fibrilación auricular de respuesta ventricular rápida, TA 78/50 mmHg y estado mental alterado. ¿Manejo inicial más adecuado?', options:['Digoxina IV','Cardioversión eléctrica sincronizada inmediata','Amiodarona oral','Anticoagulación con warfarina'], correct:1, exp:'Inestabilidad hemodinámica (hipotensión, alteración del estado mental) obliga a cardioversión eléctrica sincronizada inmediata, sin esperar anticoagulación ni fármacos orales.' },
+  { id:'arr-2', topic:'arritmias', diff:1, vignette:'Varón de 60 años con fibrilación auricular hemodinámicamente estable, FC 140 lpm. ¿Cuál es el objetivo inicial del tratamiento?', options:['Cardioversión eléctrica urgente','Control de frecuencia con betabloqueador o calcioantagonista','Ablación por catéter urgente','Marcapasos definitivo'], correct:1, exp:'En FA estable, la estrategia inicial es controlar la frecuencia (betabloqueador o calcioantagonista no dihidropiridínico) y valorar anticoagulación según CHA2DS2-VASc.' },
+  { id:'arr-3', topic:'arritmias', diff:2, vignette:'Paciente de 24 años con taquicardia supraventricular paroxística estable, FC 180 lpm, sin datos de compromiso hemodinámico. ¿Primer paso terapéutico?', options:['Adenosina IV en bolo','Cardioversión eléctrica','Maniobras vagales (Valsalva o masaje carotídeo)','Amiodarona IV'], correct:2, exp:'En TSV estable, se inician maniobras vagales antes que la farmacoterapia; si fallan, el siguiente paso es adenosina IV.' },
+  { id:'arr-4', topic:'arritmias', diff:3, vignette:'Paciente con taquicardia de complejo ancho, monomórfica, FC 190 lpm, con dolor torácico y TA 82/56 mmHg. ¿Conducta inmediata?', options:['Amiodarona IV en infusión','Cardioversión eléctrica sincronizada','Lidocaína IV','Observación y ECG seriado'], correct:1, exp:'TV con pulso pero inestable (hipotensión, dolor torácico) requiere cardioversión sincronizada inmediata.' },
+  { id:'arr-5', topic:'arritmias', diff:2, vignette:'Paciente en paro cardiorrespiratorio; el monitor muestra fibrilación ventricular. ¿Manejo inmediato?', options:['Desfibrilación no sincronizada + RCP de alta calidad','Cardioversión sincronizada','Adenosina IV','Marcapasos transcutáneo'], correct:0, exp:'FV y TV sin pulso se tratan con desfibrilación no sincronizada intercalada con compresiones de alta calidad, según el algoritmo de RCP avanzada.' },
+  { id:'arr-6', topic:'arritmias', diff:2, vignette:'Varón de 75 años con síncope, ECG con bloqueo AV completo (disociación P-QRS) y FC de escape 35 lpm sintomática. ¿Tratamiento definitivo?', options:['Atropina IV en infusión continua','Marcapasos transcutáneo temporal y luego definitivo','Betabloqueador','Digoxina'], correct:1, exp:'El bloqueo AV completo sintomático es indicación de marcapasos; de forma urgente se usa marcapasos transcutáneo/transvenoso como puente al definitivo.' },
+  { id:'arr-7', topic:'arritmias', diff:3, vignette:'Paciente con Wolff-Parkinson-White conocido desarrolla fibrilación auricular con conducción por vía accesoria, QRS ancho e irregular. ¿Qué fármaco debe evitarse?', options:['Procainamida','Amiodarona','Digoxina o verapamilo (bloqueadores del nodo AV)','Cardioversión eléctrica'], correct:2, exp:'En FA preexcitada por WPW, bloquear el nodo AV (digoxina, verapamilo, betabloqueadores) puede favorecer conducción exclusiva por la vía accesoria y degenerar en FV.' },
+
+  // ISQUÉMICA
+  { id:'isq-1', topic:'isquemica', diff:2, vignette:'Varón de 58 años con dolor torácico opresivo de 2 horas de evolución y elevación del ST en derivaciones II, III y aVF. Hospital con hemodinamia disponible en 60 minutos. ¿Manejo de reperfusión?', options:['Trombólisis inmediata','Intervención coronaria percutánea primaria','Solo tratamiento médico con antiagregantes','Cirugía de revascularización urgente'], correct:1, exp:'En IAMCEST, la ICP primaria es de elección si puede realizarse dentro de los primeros 90-120 minutos del primer contacto médico.' },
+  { id:'isq-2', topic:'isquemica', diff:1, vignette:'Paciente con angina estable de esfuerzo. ¿Cuál es el manejo médico inicial de base?', options:['Ácido acetilsalicílico, estatina, betabloqueador y nitrato sublingual de rescate','Solo reposo absoluto','Anticoagulación oral crónica','Antibiótico profiláctico'], correct:0, exp:'El tratamiento base de la angina estable incluye antiagregación, estatina de alta intensidad, betabloqueador y nitrato sublingual para las crisis.' },
+  { id:'isq-3', topic:'isquemica', diff:3, vignette:'Paciente con dolor torácico, troponina elevada y ECG sin elevación del ST pero con datos de alto riesgo (angina recurrente, inestabilidad hemodinámica). ¿Estrategia recomendada?', options:['Manejo conservador ambulatorio','Angiografía coronaria invasiva temprana (<24h)','Trombólisis','Alta con seguimiento en 1 semana'], correct:1, exp:'El síndrome coronario agudo sin elevación del ST de alto riesgo se beneficia de estrategia invasiva temprana con angiografía.' },
+  { id:'isq-4', topic:'isquemica', diff:3, vignette:'Cinco días después de un infarto agudo de miocardio, el paciente presenta un soplo holosistólico nuevo en ápex irradiado a axila y edema agudo de pulmón. ¿Complicación mecánica más probable?', options:['Ruptura de músculo papilar con insuficiencia mitral aguda','Pericarditis post-infarto','Aneurisma ventricular','Reinfarto silente'], correct:0, exp:'La ruptura del músculo papilar (frecuente en infarto inferior) produce insuficiencia mitral aguda grave con soplo nuevo y edema pulmonar súbito.' },
+  { id:'isq-5', topic:'isquemica', diff:2, vignette:'Paciente con IAM de cara inferior que, al recibir nitroglicerina, presenta hipotensión súbita. ¿Qué se debe sospechar y evitar?', options:['Infarto de ventrículo derecho; evitar nitratos y dar volumen','Taponamiento cardiaco; dar diuréticos','Disección aórtica; iniciar betabloqueador','Embolia pulmonar; dar trombolítico'], correct:0, exp:'El infarto inferior puede extenderse al ventrículo derecho, que depende de precarga; los nitratos reducen la precarga y causan hipotensión grave, por lo que están contraindicados.' },
+  { id:'isq-6', topic:'isquemica', diff:2, vignette:'Paciente que 3 semanas después de un infarto presenta fiebre, dolor pleurítico y frote pericárdico. ¿Diagnóstico probable?', options:['Síndrome de Dressler (pericarditis post-infarto tardía)','Reinfarto','Endocarditis infecciosa','Neumonía adquirida en la comunidad'], correct:0, exp:'El síndrome de Dressler es una pericarditis autoinmune tardía (semanas después del IAM), con fiebre, dolor pleurítico y frote pericárdico.' },
+
+  // INSUFICIENCIA CARDIACA
+  { id:'ic-1', topic:'ic', diff:2, vignette:'Paciente con disnea súbita, ortopnea, estertores bilaterales y saturación 84%. Se sospecha edema agudo de pulmón cardiogénico. ¿Manejo inicial?', options:['Sentar al paciente, oxígeno, diurético IV y vasodilatador','Decúbito supino y solución salina IV a chorro','Betabloqueador IV en bolo','Alta con furosemida oral'], correct:0, exp:'El edema agudo de pulmón se maneja con posición semisentada, oxígeno, diuréticos de asa IV y vasodilatadores (nitroglicerina) si la presión lo permite.' },
+  { id:'ic-2', topic:'ic', diff:2, vignette:'Paciente con insuficiencia cardiaca crónica y FEVI reducida (30%), ya estable. ¿Cuáles son los pilares del tratamiento farmacológico que reducen mortalidad?', options:['Solo diurético de asa','IECA/ARA2 o ARNI, betabloqueador, antagonista de mineralocorticoide e iSGLT2','Digoxina como único fármaco','Antibiótico profiláctico'], correct:1, exp:'La terapia con impacto en mortalidad en IC-FEr combina IECA/ARA2 (o ARNI), betabloqueador, antagonista de mineralocorticoides e inhibidores de SGLT2.' },
+  { id:'ic-3', topic:'ic', diff:1, vignette:'¿Qué clasificación se usa para valorar la limitación funcional por síntomas en insuficiencia cardiaca?', options:['Clasificación de Killip','Clasificación NYHA','Escala de Glasgow','Criterios de Jones'], correct:1, exp:'La clasificación NYHA (I-IV) valora la limitación funcional por síntomas de insuficiencia cardiaca según la actividad física.' },
+  { id:'ic-4', topic:'ic', diff:2, vignette:'Paciente con edema de miembros inferiores, ingurgitación yugular y hepatomegalia dolorosa, sin disnea significativa. ¿Predomina falla de qué cavidad?', options:['Insuficiencia cardiaca derecha','Insuficiencia cardiaca izquierda aislada','Taponamiento agudo','Estenosis mitral aguda'], correct:0, exp:'Edema periférico, ingurgitación yugular y hepatomegalia son signos clásicos de insuficiencia cardiaca derecha (congestión sistémica).' },
+  { id:'ic-5', topic:'ic', diff:1, vignette:'Paciente con disnea de esfuerzo de origen incierto. ¿Qué marcador de laboratorio apoya el diagnóstico de insuficiencia cardiaca?', options:['Péptido natriurético tipo B (BNP) elevado','Procalcitonina elevada','Dímero D elevado','Amilasa elevada'], correct:0, exp:'El BNP/NT-proBNP elevado apoya el diagnóstico de insuficiencia cardiaca en un paciente con disnea de causa incierta.' },
+
+  // VALVULOPATÍAS
+  { id:'val-1', topic:'valvular', diff:2, vignette:'Adulto mayor con síncope de esfuerzo, angina y disnea progresiva. Soplo sistólico eyectivo rudo irradiado a carótidas, con pulso parvus et tardus. ¿Diagnóstico?', options:['Estenosis aórtica','Insuficiencia mitral','Estenosis mitral','Comunicación interventricular'], correct:0, exp:'La tríada síncope-angina-disnea con soplo sistólico eyectivo irradiado a carótidas y pulso parvus et tardus es característica de estenosis aórtica severa.' },
+  { id:'val-2', topic:'valvular', diff:2, vignette:'Paciente con soplo holosistólico en foco mitral irradiado a la axila, con signos de congestión pulmonar. ¿Diagnóstico más probable?', options:['Insuficiencia mitral','Estenosis pulmonar','Estenosis aórtica','Comunicación interauricular'], correct:0, exp:'El soplo holosistólico en el ápex irradiado a axila es el hallazgo clásico de insuficiencia (regurgitación) mitral.' },
+  { id:'val-3', topic:'valvular', diff:3, vignette:'Mujer de 40 años con antecedente de fiebre reumática en la infancia, disnea progresiva, fibrilación auricular y retumbo diastólico en ápex con chasquido de apertura. ¿Diagnóstico?', options:['Estenosis mitral','Insuficiencia aórtica','Prolapso de válvula mitral','Miocardiopatía hipertrófica'], correct:0, exp:'El retumbo diastólico con chasquido de apertura, en contexto de fiebre reumática previa, es característico de estenosis mitral; predispone a fibrilación auricular por dilatación de la aurícula izquierda.' },
+  { id:'val-4', topic:'valvular', diff:2, vignette:'Mujer joven asintomática con click mesosistólico seguido de un soplo sistólico tardío en el ápex. ¿Diagnóstico más probable?', options:['Prolapso de la válvula mitral','Estenosis aórtica','Comunicación interventricular','Coartación aórtica'], correct:0, exp:'El click mesosistólico seguido de soplo sistólico tardío es el hallazgo típico del prolapso de la válvula mitral.' },
+  { id:'val-5', topic:'valvular', diff:3, vignette:'Paciente con soplo diastólico decreciente en el borde esternal izquierdo, presión de pulso amplia y pulso céler (en martillo de agua). ¿Diagnóstico y una causa posible?', options:['Insuficiencia aórtica; endocarditis infecciosa o disección aórtica','Estenosis pulmonar; cardiopatía congénita','Estenosis tricuspídea; fiebre reumática','Insuficiencia mitral; prolapso valvular'], correct:0, exp:'El soplo diastólico decreciente con pulso céler (Corrigan) y presión de pulso amplia corresponde a insuficiencia aórtica, cuyas causas incluyen endocarditis, disección aórtica y enfermedades del tejido conectivo (Marfan).' },
+
+  // HIPERTENSIÓN ARTERIAL
+  { id:'has-1', topic:'has', diff:2, vignette:'Paciente con TA 210/125 mmHg, cefalea intensa, confusión y papiledema (encefalopatía hipertensiva). ¿Cómo se clasifica y cuál es la meta inicial de manejo?', options:['Urgencia hipertensiva; reducir la TA en 24-48 horas por vía oral','Emergencia hipertensiva; reducir la TA media ~25% en la primera hora con fármacos IV','HAS no controlada; ajustar tratamiento ambulatorio','Crisis de pánico; ansiolítico'], correct:1, exp:'La presencia de daño agudo a órgano blanco (encefalopatía) define una emergencia hipertensiva: requiere reducción controlada e IV, aproximadamente 25% de la TA media en la primera hora.' },
+  { id:'has-2', topic:'has', diff:1, vignette:'¿Qué diferencia a una urgencia de una emergencia hipertensiva?', options:['El nivel absoluto de la presión arterial únicamente','La presencia o ausencia de daño agudo a órgano blanco','La edad del paciente','El uso previo de antihipertensivos'], correct:1, exp:'La distinción clave no es el número de presión arterial, sino si existe daño agudo a órgano blanco (emergencia) o no (urgencia).' },
+  { id:'has-3', topic:'has', diff:2, vignette:'Paciente con hipertensión arterial crónica sin comorbilidades relevantes que inicia tratamiento de primera línea. ¿Qué grupo farmacológico es una opción de primera línea?', options:['IECA/ARA2, calcioantagonista o diurético tiazídico','Nitroprusiato oral','Digoxina','Antiarrítmico clase I'], correct:0, exp:'Los IECA/ARA2, calcioantagonistas y diuréticos tiazídicos son opciones de primera línea para hipertensión arterial no complicada, individualizando según comorbilidades.' },
+  { id:'has-4', topic:'has', diff:3, vignette:'Paciente joven con hipertensión episódica, cefalea, palpitaciones y diaforesis paroxística. ¿Qué causa secundaria de hipertensión debe sospecharse?', options:['Feocromocitoma','Hipotiroidismo','Estenosis mitral','Anemia ferropénica'], correct:0, exp:'La tríada de cefalea, palpitaciones y diaforesis en crisis paroxísticas con hipertensión episódica sugiere feocromocitoma.' },
+
+  // CARDIOPATÍAS CONGÉNITAS
+  { id:'cong-1', topic:'congenitas', diff:1, vignette:'Lactante con soplo pansistólico rudo en el borde esternal izquierdo bajo, detectado en las primeras semanas de vida. ¿Diagnóstico más probable?', options:['Comunicación interventricular','Comunicación interauricular','Persistencia del conducto arterioso','Tetralogía de Fallot'], correct:0, exp:'El soplo pansistólico en el borde esternal izquierdo bajo es característico de la comunicación interventricular, la cardiopatía congénita más frecuente.' },
+  { id:'cong-2', topic:'congenitas', diff:2, vignette:'Niño con soplo sistólico suave en foco pulmonar y desdoblamiento fijo del segundo ruido cardiaco. ¿Diagnóstico probable?', options:['Comunicación interauricular','Estenosis aórtica','Coartación aórtica','Insuficiencia mitral'], correct:0, exp:'El desdoblamiento fijo de S2 junto con soplo sistólico pulmonar es característico de la comunicación interauricular.' },
+  { id:'cong-3', topic:'congenitas', diff:2, vignette:'Recién nacido con antecedente de rubéola congénita presenta un soplo continuo "en maquinaria" bajo la clavícula izquierda. ¿Diagnóstico?', options:['Persistencia del conducto arterioso','Tetralogía de Fallot','Transposición de grandes vasos','Atresia tricuspídea'], correct:0, exp:'El soplo continuo "en maquinaria" y el antecedente de rubéola congénita son característicos de la persistencia del conducto arterioso.' },
+  { id:'cong-4', topic:'congenitas', diff:3, vignette:'Lactante con cianosis progresiva que empeora con el llanto y episodios de hipoxia que mejoran al colocarlo en posición genupectoral (cuclillas). ¿Diagnóstico más probable?', options:['Tetralogía de Fallot','Comunicación interventricular aislada','Coartación aórtica','Estenosis mitral congénita'], correct:0, exp:'Las crisis de hipoxia que mejoran con la posición en cuclillas (aumenta resistencia vascular sistémica y reduce el cortocircuito derecha-izquierda) son típicas de la tetralogía de Fallot.' },
+  { id:'cong-5', topic:'congenitas', diff:2, vignette:'Adolescente con hipertensión arterial en miembros superiores, pulsos femorales débiles y retardados, y notching costal en la radiografía de tórax. ¿Diagnóstico?', options:['Coartación de la aorta','Estenosis aórtica valvular','Persistencia del conducto arterioso','Insuficiencia aórtica'], correct:0, exp:'La combinación de hipertensión en miembros superiores, pulsos femorales disminuidos/retardados y muescas costales por circulación colateral es característica de coartación aórtica.' },
+
+  // ENDOCARDITIS
+  { id:'endo-1', topic:'endocarditis', diff:2, vignette:'Paciente con fiebre prolongada, soplo cardiaco de nueva aparición y lesiones de Janeway en palmas. ¿Diagnóstico más probable y estudios clave?', options:['Endocarditis infecciosa; hemocultivos seriados y ecocardiograma','Fiebre reumática; antiestreptolisinas','Pericarditis viral; serologías','Miocarditis; biopsia endomiocárdica'], correct:0, exp:'Fiebre, soplo nuevo y fenómenos embólicos/inmunológicos (Janeway, Osler, Roth) orientan a endocarditis infecciosa; el diagnóstico se apoya en hemocultivos y ecocardiograma (criterios de Duke).' },
+  { id:'endo-2', topic:'endocarditis', diff:2, vignette:'Usuario de drogas intravenosas con fiebre y émbolos sépticos pulmonares. ¿Qué válvula y microorganismo son los más probablemente implicados?', options:['Válvula tricúspide; Staphylococcus aureus','Válvula mitral; Streptococcus viridans','Válvula aórtica; Enterococcus faecalis','Válvula pulmonar; Candida albicans'], correct:0, exp:'En usuarios de drogas intravenosas, la endocarditis afecta típicamente la válvula tricúspide y el patógeno más frecuente es Staphylococcus aureus.' },
+  { id:'endo-3', topic:'endocarditis', diff:3, vignette:'Paciente con prótesis valvular que va a someterse a una extracción dental. ¿Está indicada la profilaxis antibiótica?', options:['Sí, por ser un paciente de alto riesgo sometido a procedimiento dental','No, la profilaxis nunca está indicada','Solo si tiene fiebre en ese momento','Solo en procedimientos gastrointestinales'], correct:0, exp:'Pacientes de alto riesgo (prótesis valvular, endocarditis previa, ciertas cardiopatías congénitas) requieren profilaxis antibiótica antes de procedimientos dentales que involucren manipulación gingival.' },
+
+  // PERICARDIO
+  { id:'peri-1', topic:'pericardio', diff:1, vignette:'Paciente con dolor torácico pleurítico que mejora al inclinarse hacia adelante, frote pericárdico a la auscultación y elevación difusa del ST cóncava en el ECG. ¿Diagnóstico?', options:['Pericarditis aguda','Infarto agudo de miocardio','Neumotórax','Disección aórtica'], correct:0, exp:'Dolor pleurítico posicional, frote pericárdico y elevación difusa cóncava del ST (sin imagen especular) son característicos de pericarditis aguda.' },
+  { id:'peri-2', topic:'pericardio', diff:2, vignette:'Paciente con hipotensión, ingurgitación yugular y ruidos cardiacos velados (tríada de Beck), además de pulso paradójico. ¿Diagnóstico y manejo inmediato?', options:['Taponamiento cardiaco; pericardiocentesis urgente','Insuficiencia cardiaca derecha; diurético IV','Neumotórax a tensión; toracostomía','Embolia pulmonar masiva; trombólisis'], correct:0, exp:'La tríada de Beck y el pulso paradójico son característicos de taponamiento cardiaco, que requiere pericardiocentesis urgente.' },
+  { id:'peri-3', topic:'pericardio', diff:3, vignette:'Paciente con antecedente de pericarditis recurrente que ahora presenta edema, ascitis y signo de Kussmaul (aumento de la presión venosa yugular con la inspiración). ¿Diagnóstico?', options:['Pericarditis constrictiva','Taponamiento cardiaco agudo','Miocardiopatía dilatada','Estenosis tricuspídea aguda'], correct:0, exp:'El signo de Kussmaul junto con congestión sistémica crónica en un paciente con pericarditis previa sugiere pericarditis constrictiva.' },
+
+  // FIEBRE REUMÁTICA
+  { id:'reum-1', topic:'reumatica', diff:2, vignette:'Niño con faringoamigdalitis 2-3 semanas antes, ahora con poliartritis migratoria, carditis y nódulos subcutáneos. ¿Con qué criterios se establece el diagnóstico?', options:['Criterios de Jones','Criterios de Duke','Criterios de Light','Escala de Framingham'], correct:0, exp:'El diagnóstico de fiebre reumática se basa en los criterios de Jones (mayores: carditis, poliartritis, corea, eritema marginado, nódulos subcutáneos; más evidencia de infección estreptocócica previa).' },
+  { id:'reum-2', topic:'reumatica', diff:2, vignette:'Paciente con antecedente de fiebre reumática. ¿Cuál es la profilaxis secundaria recomendada para prevenir recurrencias?', options:['Penicilina benzatínica intramuscular mensual','Amoxicilina oral solo si hay síntomas','Vacuna antiestreptocócica','Aspirina diaria de por vida'], correct:0, exp:'La profilaxis secundaria estándar es penicilina G benzatínica intramuscular mensual, para prevenir infecciones estreptocócicas recurrentes y nuevos brotes de carditis.' },
+  { id:'reum-3', topic:'reumatica', diff:1, vignette:'¿Cuál es la valvulopatía crónica más frecuentemente asociada a fiebre reumática recurrente?', options:['Estenosis mitral','Estenosis pulmonar','Insuficiencia tricuspídea aislada','Estenosis aórtica congénita'], correct:0, exp:'La cardiopatía reumática crónica afecta predominantemente la válvula mitral, produciendo típicamente estenosis mitral.' },
+
+  // SHOCK CARDIOGÉNICO
+  { id:'shock-1', topic:'shock', diff:3, vignette:'Paciente post-IAM extenso con hipotensión persistente, extremidades frías y sudorosas, oliguria y estertores pulmonares. ¿Diagnóstico y manejo general?', options:['Shock cardiogénico; soporte inotrópico y valorar revascularización/balón de contrapulsación','Shock séptico; antibiótico de amplio espectro','Shock hipovolémico; cristaloides a chorro','Shock anafiláctico; adrenalina IM'], correct:0, exp:'El shock cardiogénico post-IAM se caracteriza por hipoperfusión con extremidades frías; el manejo incluye soporte inotrópico, revascularización urgente y, si es necesario, dispositivos de asistencia circulatoria.' },
+  { id:'shock-2', topic:'shock', diff:2, vignette:'¿Qué hallazgo clínico ayuda a distinguir el shock cardiogénico (frío) del shock séptico (caliente) en su fase inicial?', options:['Temperatura y perfusión de las extremidades (frías y mal perfundidas vs. calientes y bien perfundidas)','El nivel de conciencia únicamente','La frecuencia respiratoria','El color de la piel del tronco'], correct:0, exp:'En el shock cardiogénico predomina la vasoconstricción periférica (extremidades frías), mientras que en la fase caliente del shock séptico hay vasodilatación con extremidades calientes.' },
+  { id:'shock-3', topic:'shock', diff:2, vignette:'Paciente en shock cardiogénico con presión de enclavamiento pulmonar elevada y congestión pulmonar franca. ¿Qué tipo de fármaco vasoactivo suele evitarse por empeorar la congestión?', options:['Grandes volúmenes de cristaloides IV','Inotrópicos como dobutamina','Vasopresores a dosis bajas','Diuréticos de asa'], correct:0, exp:'En shock cardiogénico con congestión (presiones de llenado altas), la administración agresiva de líquidos empeora el edema pulmonar; se prefiere soporte inotrópico y diuréticos según el perfil hemodinámico.' },
+
+  // MIOCARDIOPATÍAS
+  { id:'mio-1', topic:'miocardio', diff:3, vignette:'Deportista joven con síncope durante el ejercicio, soplo sistólico que aumenta con la maniobra de Valsalva y antecedente familiar de muerte súbita. ¿Diagnóstico probable?', options:['Miocardiopatía hipertrófica','Miocardiopatía dilatada','Pericarditis constrictiva','Insuficiencia mitral crónica'], correct:0, exp:'La miocardiopatía hipertrófica obstructiva produce un soplo que aumenta con maniobras que reducen la precarga (Valsalva, bipedestación) y es causa importante de muerte súbita en atletas jóvenes.' },
+  { id:'mio-2', topic:'miocardio', diff:2, vignette:'Paciente con antecedente de consumo crónico de alcohol que desarrolla insuficiencia cardiaca con cardiomegalia y FEVI muy reducida, sin enfermedad coronaria significativa. ¿Diagnóstico más probable?', options:['Miocardiopatía dilatada','Miocardiopatía hipertrófica','Miocardiopatía restrictiva','Estenosis aórtica'], correct:0, exp:'El consumo crónico de alcohol es una causa reconocida de miocardiopatía dilatada, con dilatación ventricular y disfunción sistólica.' },
+  { id:'mio-3', topic:'miocardio', diff:3, vignette:'Paciente con signos predominantes de insuficiencia cardiaca derecha, ventrículos de tamaño normal o pequeño, con función sistólica conservada pero llenado diastólico muy restringido; se sospecha amiloidosis. ¿Diagnóstico?', options:['Miocardiopatía restrictiva','Miocardiopatía dilatada','Miocardiopatía hipertrófica','Pericarditis aguda'], correct:0, exp:'La miocardiopatía restrictiva (por ejemplo, por amiloidosis) se caracteriza por disfunción diastólica grave con función sistólica preservada y predominio de congestión derecha.' },
+  { id:'mio-4', topic:'miocardio', diff:2, vignette:'Mujer en el último mes de embarazo o primeros meses posparto que desarrolla disnea, edema y FEVI reducida sin otra causa identificable. ¿Diagnóstico?', options:['Miocardiopatía periparto','Embolia de líquido amniótico','Preeclampsia','Tromboembolia pulmonar'], correct:0, exp:'La miocardiopatía periparto se presenta al final del embarazo o en los meses posteriores al parto, con disfunción sistólica de novo sin otra causa identificable.' },
+
+  // ECG BÁSICO
+  { id:'ecg-1', topic:'ecg', diff:1, vignette:'En un ECG se observa ausencia de ondas P organizadas, con línea de base fibrilatoria y intervalos R-R completamente irregulares. ¿Ritmo más probable?', options:['Fibrilación auricular','Ritmo sinusal normal','Flutter auricular con conducción fija','Bloqueo AV completo'], correct:0, exp:'La ausencia de ondas P organizadas junto con R-R irregular es el hallazgo característico de la fibrilación auricular.' },
+  { id:'ecg-2', topic:'ecg', diff:2, vignette:'Un ECG muestra elevación del ST en II, III y aVF con descenso especular en I y aVL. ¿Territorio y arteria más probablemente involucrada?', options:['Pared inferior; arteria coronaria derecha (habitualmente)','Pared anterior; descendente anterior','Pared lateral alta; circunfleja','Pared posterior aislada; marginal obtusa'], correct:0, exp:'La elevación del ST en derivaciones inferiores (II, III, aVF) con imagen en espejo en I y aVL sugiere infarto de cara inferior, típicamente por oclusión de la coronaria derecha.' },
+  { id:'ecg-3', topic:'ecg', diff:2, vignette:'Paciente con dolor torácico agudo y un ECG que muestra bloqueo de rama izquierda que no existía en trazos previos. ¿Cómo debe interpretarse en este contexto?', options:['Como equivalente de infarto agudo de miocardio con elevación del ST hasta demostrar lo contrario','Como hallazgo benigno sin relevancia','Como signo de hipertrofia ventricular crónica','Como artefacto técnico del electrocardiógrafo'], correct:0, exp:'Un bloqueo de rama izquierda de nueva aparición en el contexto de dolor torácico agudo se maneja como equivalente de IAMCEST.' },
+  { id:'ecg-4', topic:'ecg', diff:3, vignette:'Paciente con insuficiencia renal presenta en el ECG ondas T picudas y simétricas junto con ensanchamiento progresivo del QRS. ¿Alteración electrolítica más probable?', options:['Hiperkalemia','Hipokalemia','Hipercalcemia','Hiponatremia'], correct:0, exp:'Las ondas T picudas y el ensanchamiento del QRS son cambios progresivos característicos de la hiperkalemia, frecuente en insuficiencia renal.' },
+  { id:'ecg-5', topic:'ecg', diff:3, vignette:'Paciente con antecedente de uso de antiarrítmicos que presenta un intervalo QT muy prolongado en el ECG y episodios sincopales con taquicardia ventricular polimórfica. ¿Qué arritmia se sospecha?', options:['Torsade de pointes por QT largo','Fibrilación auricular','Bloqueo AV de primer grado','Extrasístoles ventriculares benignas'], correct:0, exp:'El QT largo predispone a torsade de pointes, una taquicardia ventricular polimórfica que puede causar síncope o muerte súbita.' },
+];
+
+/* ------------------------------------------------------------------
+   MOTOR DEL JUEGO
+------------------------------------------------------------------- */
+const STORAGE_KEY = 'pulso_enarm_v1';
+const DECK_SIZE = 12;
+const MIN_DECK = 5;
+const LIVES_START = 3;
+const TIME_BY_DIFF = { 1:26000, 2:20000, 3:16000 };
+
+const qs = (id) => document.getElementById(id);
+const byId = Object.fromEntries(QUESTIONS.map(q => [q.id, q]));
+const byTopic = Object.fromEntries(TOPICS.map(t => [t.id, QUESTIONS.filter(q => q.topic === t.id)]));
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return { player: { xp:0, gamesPlayed:0, bestScore:0, totalCorrect:0, totalAnswered:0, streak:0, lastPlayedDate:null }, cards:{} };
+}
+function saveData(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(DATA)); }
+
+let DATA = loadData();
+let selectedTopics = new Set(); // empty = all topics
+
+const S = { screen:'menu', run:null };
+
+function levelFromXp(xp){
+  let lvl=1, needed=100, total=0;
+  while(xp >= total + needed){ total += needed; lvl++; needed = Math.round(needed*1.25); }
+  return { level:lvl, into: xp-total, span: needed };
+}
+
+function ensureCard(id){
+  if(!DATA.cards[id]) DATA.cards[id] = { ef:2.5, interval:0, reps:0, due: Date.now(), lapses:0, seen:false };
+  return DATA.cards[id];
+}
+
+function scheduleCard(id, quality){
+  const c = ensureCard(id);
+  c.seen = true;
+  if(quality < 3){
+    c.reps = 0; c.interval = 1; c.lapses++;
+  } else {
+    if(c.reps === 0) c.interval = 1;
+    else if(c.reps === 1) c.interval = 6;
+    else c.interval = Math.round(c.interval * c.ef);
+    c.reps++;
+  }
+  c.ef = Math.max(1.3, c.ef + (0.1 - (5-quality)*(0.08+(5-quality)*0.02)));
+  c.due = Date.now() + c.interval*86400000;
+}
+
+function pool(){
+  if(selectedTopics.size === 0) return QUESTIONS;
+  return QUESTIONS.filter(q => selectedTopics.has(q.topic));
+}
+
+function dueCount(){
+  const now = Date.now();
+  return pool().filter(q => DATA.cards[q.id] && DATA.cards[q.id].due <= now).length;
+}
+function newCount(){
+  return pool().filter(q => !DATA.cards[q.id]).length;
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function buildDeck(){
+  const now = Date.now();
+  const p = pool();
+  const due = shuffle(p.filter(q => DATA.cards[q.id] && DATA.cards[q.id].due <= now));
+  const fresh = shuffle(p.filter(q => !DATA.cards[q.id]));
+  let deck = due.slice(0, DECK_SIZE).concat(fresh);
+  if(deck.length < MIN_DECK){
+    const rest = shuffle(p.filter(q => !deck.includes(q)));
+    deck = deck.concat(rest);
+  }
+  deck = deck.slice(0, DECK_SIZE);
+  return shuffle(deck);
+}
+
+function computeScore(diff, comboAfter, fracRemaining){
+  const mult = comboAfter>=10 ? 3 : comboAfter>=6 ? 2 : comboAfter>=3 ? 1.5 : 1;
+  const speedBonus = fracRemaining>0.6 ? 5 : fracRemaining>0.3 ? 2 : 0;
+  return Math.round(10*diff*mult) + speedBonus;
+}
+
+function startRun(){
+  const deck = buildDeck();
+  if(deck.length === 0){ toast('No hay preguntas en los temas seleccionados.'); return; }
+  S.run = {
+    deck, pos:0, lives:LIVES_START, combo:0, maxCombo:0, score:0,
+    correct:0, answered:0, requeued:new Set(), topicStats:{},
+    answeredCurrent:false, selectedIndex:null, cardShownAt:Date.now(),
+    timerId:null, remainingMs: TIME_BY_DIFF[deck[0].diff], totalMs: TIME_BY_DIFF[deck[0].diff],
+    finished:false, gameOver:false,
+  };
+  S.screen = 'run';
+  render();
+  beginTimer();
+}
+
+function currentQuestion(){
+  return S.run ? S.run.deck[S.run.pos] : null;
+}
+
+function beginTimer(){
+  clearInterval(S.run.timerId);
+  const q = currentQuestion();
+  S.run.totalMs = TIME_BY_DIFF[q.diff];
+  S.run.remainingMs = S.run.totalMs;
+  S.run.cardShownAt = Date.now();
+  updateTimerDom();
+  S.run.timerId = setInterval(() => {
+    if(!S.run || S.run.answeredCurrent) return;
+    S.run.remainingMs -= 100;
+    if(S.run.remainingMs <= 0){
+      S.run.remainingMs = 0;
+      updateTimerDom();
+      clearInterval(S.run.timerId);
+      handleAnswer(null);
+      return;
+    }
+    updateTimerDom();
+  }, 100);
+}
+
+function updateTimerDom(){
+  const bar = qs('timerBar');
+  const label = qs('timerLabel');
+  if(!bar || !S.run) return;
+  const frac = Math.max(0, S.run.remainingMs / S.run.totalMs);
+  bar.style.width = (frac*100).toFixed(1)+'%';
+  bar.style.background = frac < 0.25 ? 'var(--danger)' : frac < 0.5 ? 'var(--amber)' : 'var(--accent)';
+  if(label) label.textContent = Math.ceil(S.run.remainingMs/1000)+'s';
+  ecgUrgency = frac < 0.3 && !S.run.answeredCurrent ? 1.9 : 1;
+}
+
+function handleAnswer(selectedIndex){
+  const run = S.run;
+  if(!run || run.answeredCurrent) return;
+  clearInterval(run.timerId);
+  const q = currentQuestion();
+  const elapsed = Date.now() - run.cardShownAt;
+  const fracRemaining = Math.max(0, (run.totalMs - elapsed)/run.totalMs);
+  const correct = selectedIndex === q.correct;
+
+  let quality;
+  if(selectedIndex === null) quality = 1;
+  else if(correct) quality = fracRemaining>0.6 ? 5 : fracRemaining>0.25 ? 4 : 3;
+  else quality = 2;
+
+  scheduleCard(q.id, quality);
+  saveData();
+
+  run.answered++;
+  run.topicStats[q.topic] = run.topicStats[q.topic] || { correct:0, total:0 };
+  run.topicStats[q.topic].total++;
+
+  if(correct){
+    run.correct++;
+    run.combo++;
+    run.maxCombo = Math.max(run.maxCombo, run.combo);
+    run.topicStats[q.topic].correct++;
+    run.score += computeScore(q.diff, run.combo, fracRemaining);
+    if(run.combo>0 && run.combo%3===0) toast('¡Racha x'+(run.combo>=10?3:run.combo>=6?2:1.5)+'! Combo '+run.combo);
+  } else {
+    run.lives--;
+    run.combo = 0;
+    if(!run.requeued.has(q.id) && run.pos + 4 < run.deck.length + 1){
+      run.requeued.add(q.id);
+      const insertAt = Math.min(run.deck.length, run.pos + 1 + Math.floor(Math.random()*3)+1);
+      run.deck.splice(insertAt, 0, q);
+    }
+  }
+
+  run.answeredCurrent = true;
+  run.selectedIndex = selectedIndex;
+  render();
+}
+
+function continueRun(){
+  const run = S.run;
+  if(!run) return;
+  if(run.lives <= 0){ finishRun(true); return; }
+  run.pos++;
+  if(run.pos >= run.deck.length){ finishRun(false); return; }
+  run.answeredCurrent = false;
+  run.selectedIndex = null;
+  render();
+  beginTimer();
+}
+
+function finishRun(gameOver){
+  const run = S.run;
+  clearInterval(run.timerId);
+  run.finished = true;
+  run.gameOver = gameOver;
+
+  const xpGained = run.score;
+  DATA.player.xp += xpGained;
+  DATA.player.gamesPlayed++;
+  DATA.player.bestScore = Math.max(DATA.player.bestScore, run.score);
+  DATA.player.totalCorrect += run.correct;
+  DATA.player.totalAnswered += run.answered;
+
+  const today = new Date().toDateString();
+  const last = DATA.player.lastPlayedDate;
+  if(last !== today){
+    const yesterday = new Date(Date.now()-86400000).toDateString();
+    DATA.player.streak = (last === yesterday) ? DATA.player.streak + 1 : 1;
+    DATA.player.lastPlayedDate = today;
+  }
+  saveData();
+  S.screen = 'summary';
+  render();
+  if(gameOver){ ecgFlatline(); } else { ecgUrgency = 1; }
+}
+
+let toastTimer = null;
+function toast(msg){
+  const t = qs('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+}
+
+/* ------------------------------------------------------------------
+   RENDER
+------------------------------------------------------------------- */
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderTopbar(){
+  const lvl = levelFromXp(DATA.player.xp);
+  qs('topbar').innerHTML = `
+    <div class="topbar">
+      <div class="brand">
+        <span class="brand-mark">PULSO</span>
+        <span class="brand-sub">Entrenador ENARM · Cardiología</span>
+      </div>
+      <div class="topbar-stats">
+        <div class="chip" title="Nivel (${lvl.into}/${lvl.span} XP)">NIV <b>${lvl.level}</b></div>
+        <div class="chip" title="Racha de días de estudio">\u{1F525} <b>${DATA.player.streak}</b></div>
+      </div>
+    </div>`;
+}
+
+function topicName(id){ return (TOPICS.find(t=>t.id===id)||{}).name || id; }
+
+function screenMenu(){
+  const due = dueCount();
+  const fresh = newCount();
+  const chips = TOPICS.map(t => {
+    const active = selectedTopics.has(t.id);
+    const n = byTopic[t.id].length;
+    return `<button class="topic-chip ${active?'active':''}" data-action="toggle-topic" data-topic="${t.id}">${t.glyph} ${esc(t.name)} <span class="n">${n}</span></button>`;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="eyebrow">Consulta de hoy</div>
+      <h1>${due>0 ? due+' tarjeta'+(due===1?'':'s')+' listas para repasar' : 'Sin repasos pendientes'}</h1>
+      <p class="muted">${fresh} pregunta${fresh===1?'':'s'} nueva${fresh===1?'':'s'} disponible${fresh===1?'':'s'} en los temas seleccionados. Cada ronda mezcla tus repasos vencidos con casos nuevos.</p>
+    </div>
+    <div class="section">
+      <div class="eyebrow">Temas (toca para filtrar, ninguno = todos)</div>
+      <div class="topics-grid">${chips}</div>
+    </div>
+    <div class="section">
+      <button class="btn btn-primary btn-block" data-action="start-run">Iniciar ronda ♥</button>
+    </div>
+    <div class="btn-row">
+      <button class="footer-link" data-action="go-stats">Ver progreso por tema</button>
+      <span class="muted">·</span>
+      <button class="footer-link" data-action="go-help">Cómo funciona / créditos</button>
+    </div>`;
+}
+
+function screenRun(){
+  const run = S.run;
+  const q = currentQuestion();
+  const hearts = Array.from({length:LIVES_START}).map((_,i) => `<span class="${i<run.lives?'':'heart-lost'}">♥</span>`).join('');
+  const comboMult = run.combo>=10?3:run.combo>=6?2:run.combo>=3?1.5:1;
+  const dots = Array.from({length:3}).map((_,i)=>`<span class="${i<q.diff?'on':''}"></span>`).join('');
+
+  const optionsHtml = q.options.map((opt,i) => {
+    let cls = 'option';
+    if(run.answeredCurrent){
+      if(i === q.correct) cls += ' correct';
+      else if(i === run.selectedIndex) cls += ' wrong';
+      else cls += ' dim';
+    }
+    return `<button class="${cls}" data-action="answer" data-index="${i}" ${run.answeredCurrent?'disabled':''}>
+      <span class="letter">${String.fromCharCode(65+i)}</span><span>${esc(opt)}</span>
+    </button>`;
+  }).join('');
+
+  let feedback = '';
+  if(run.answeredCurrent){
+    const correct = run.selectedIndex === q.correct;
+    feedback = `
+      <div class="feedback ${correct?'ok':'bad'}">
+        <div class="verdict">${correct ? '✓ Correcto' : (run.selectedIndex===null ? '✕ Tiempo agotado' : '✕ Incorrecto')}</div>
+        <div class="exp">${esc(q.exp)}</div>
+      </div>
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-primary btn-block" data-action="continue">${run.lives<=0 ? 'Ver resultados' : 'Continuar'}</button>
+      </div>`;
+  }
+
+  return `
+    <div class="run-hud">
+      <div class="hearts">${hearts}</div>
+      <div class="hud-mono">Puntos: ${run.score}</div>
+      <div class="combo-badge">Combo x${comboMult}</div>
+      <div class="hud-mono" id="timerLabel">${Math.ceil(run.remainingMs/1000)}s</div>
+      <div class="timer-wrap"><div class="timer-bar-bg"><div class="timer-bar" id="timerBar"></div></div></div>
+    </div>
+    <div class="card-panel">
+      <div class="vignette-topic">
+        <span class="eyebrow" style="margin:0;">${esc(topicName(q.topic))}</span>
+        <span class="diff-dots">${dots}</span>
+      </div>
+      <div class="vignette">${esc(q.vignette)}</div>
+      <div class="options">${optionsHtml}</div>
+      ${feedback}
+    </div>`;
+}
+
+function screenSummary(){
+  const run = S.run;
+  const acc = run.answered ? Math.round(100*run.correct/run.answered) : 0;
+  const lvl = levelFromXp(DATA.player.xp);
+  const topicRows = Object.keys(run.topicStats).map(tid => {
+    const s = run.topicStats[tid];
+    return `<div class="topic-bar-row">
+      <div class="topic-bar-name">${esc(topicName(tid))}</div>
+      <div class="topic-bar-track"><div class="topic-bar-fill mature" style="flex:${s.correct} 0 0;"></div><div class="topic-bar-fill" style="flex:${s.total-s.correct} 0 0; background:var(--border);"></div></div>
+      <div class="topic-bar-count">${s.correct}/${s.total}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="eyebrow">${run.gameOver ? 'Ronda terminada · sin vidas' : 'Ronda completa'}</div>
+      <h1>${run.gameOver ? 'Fin de la ronda' : '¡Bien hecho!'}</h1>
+      <p class="muted">Ganaste <b>${run.score} XP</b> · ahora nivel ${lvl.level}.</p>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="k">Aciertos</div><div class="v">${run.correct}/${run.answered}</div></div>
+      <div class="stat-box"><div class="k">Precisión</div><div class="v">${acc}%</div></div>
+      <div class="stat-box"><div class="k">Mejor combo</div><div class="v">x${run.maxCombo}</div></div>
+      <div class="stat-box"><div class="k">Puntaje</div><div class="v">${run.score}</div></div>
+    </div>
+    <div class="section">
+      <div class="eyebrow">Por tema en esta ronda</div>
+      ${topicRows || '<p class="muted">Sin datos.</p>'}
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" data-action="start-run">Jugar de nuevo</button>
+      <button class="btn" data-action="go-menu">Volver al menú</button>
+    </div>`;
+}
+
+function screenStats(){
+  const now = Date.now();
+  const rows = TOPICS.map(t => {
+    const qs_ = byTopic[t.id];
+    const total = qs_.length;
+    let mature=0, learning=0, fresh=0, due=0;
+    qs_.forEach(q => {
+      const c = DATA.cards[q.id];
+      if(!c){ fresh++; return; }
+      if(c.interval >= 21) mature++; else learning++;
+      if(c.due <= now) due++;
+    });
+    return `<div class="topic-bar-row">
+      <div class="topic-bar-name">${t.glyph} ${esc(t.name)}</div>
+      <div class="topic-bar-track">
+        <div class="topic-bar-fill mature" style="flex:${mature} 0 0;"></div>
+        <div class="topic-bar-fill learning" style="flex:${learning} 0 0;"></div>
+        <div class="topic-bar-fill newf" style="flex:${fresh} 0 0;"></div>
+      </div>
+      <div class="topic-bar-count">${due>0 ? due+' ●' : total+' t'}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="eyebrow">Progreso</div>
+      <h1>Tu curva de retención</h1>
+      <p class="muted">Verde = dominada (≥21 días de intervalo) · ámbar = en aprendizaje · gris = aún no vista. El punto rojo indica temas con repasos vencidos.</p>
+    </div>
+    <div class="section">${rows}</div>
+    <div class="legend">
+      <span><i style="background:var(--success);"></i>Dominada</span>
+      <span><i style="background:var(--amber);"></i>En aprendizaje</span>
+      <span><i style="background:var(--accent-dim);"></i>Nueva</span>
+    </div>
+    <div class="stat-row">
+      <div class="stat-box"><div class="k">Partidas jugadas</div><div class="v">${DATA.player.gamesPlayed}</div></div>
+      <div class="stat-box"><div class="k">Mejor puntaje</div><div class="v">${DATA.player.bestScore}</div></div>
+      <div class="stat-box"><div class="k">Precisión histórica</div><div class="v">${DATA.player.totalAnswered? Math.round(100*DATA.player.totalCorrect/DATA.player.totalAnswered):0}%</div></div>
+    </div>
+    <button class="btn" data-action="go-menu">Volver al menú</button>`;
+}
+
+function screenHelp(){
+  return `
+    <div class="section">
+      <div class="eyebrow">Cómo funciona</div>
+      <h1>Estudiar como un juego</h1>
+      <p>Cada ronda mezcla las tarjetas que ya te tocaba repasar (según un algoritmo de repetición espaciada tipo SM-2) con preguntas nuevas del tema que elijas. Tienes ${LIVES_START} vidas y un contador de tiempo por caso: entre más rápido y en racha aciertes, más puntos y XP ganas. Si fallas, la pregunta puede volver a aparecer más adelante en la misma ronda.</p>
+      <p class="muted">El progreso (tarjetas, nivel, racha) se guarda solo en este navegador (localStorage), no se sincroniza ni se envía a ningún servidor.</p>
+    </div>
+    <div class="section">
+      <div class="eyebrow">Aviso</div>
+      <p class="muted">Contenido de práctica creado como ejercicio de estudio, inspirado en el formato de repaso de ENARMIUM. No es material oficial del ENARM y no sustituye tus fuentes de estudio principales.</p>
+    </div>
+    <button class="btn" data-action="go-menu">Volver al menú</button>`;
+}
+
+function render(){
+  renderTopbar();
+  const app = qs('app');
+  if(S.screen === 'menu') app.innerHTML = screenMenu();
+  else if(S.screen === 'run') app.innerHTML = screenRun();
+  else if(S.screen === 'summary') app.innerHTML = screenSummary();
+  else if(S.screen === 'stats') app.innerHTML = screenStats();
+  else if(S.screen === 'help') app.innerHTML = screenHelp();
+}
+
+/* ------------------------------------------------------------------
+   EVENTOS
+------------------------------------------------------------------- */
+qs('app').addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if(!el) return;
+  const action = el.dataset.action;
+  if(action === 'toggle-topic'){
+    const t = el.dataset.topic;
+    if(selectedTopics.has(t)) selectedTopics.delete(t); else selectedTopics.add(t);
+    render();
+  } else if(action === 'start-run'){
+    startRun();
+  } else if(action === 'answer'){
+    handleAnswer(parseInt(el.dataset.index,10));
+  } else if(action === 'continue'){
+    continueRun();
+  } else if(action === 'go-menu'){
+    S.screen = 'menu'; render();
+  } else if(action === 'go-stats'){
+    S.screen = 'stats'; render();
+  } else if(action === 'go-help'){
+    S.screen = 'help'; render();
+  }
+});
+
+/* ------------------------------------------------------------------
+   TRAZO ECG (canvas ambiental, reacciona al juego)
+------------------------------------------------------------------- */
+const ecgCanvas = qs('ecg');
+const ecgCtx = ecgCanvas.getContext('2d');
+let ecgUrgency = 1;
+let ecgAmp = 1;
+let ecgFlatlining = false;
+let ecgScroll = 0;
+let ecgLastT = performance.now();
+
+const KEYPOINTS = [[0,0],[16,-5],[34,0],[46,0],[49,5],[53,-62],[59,22],[65,0],[72,0],[98,-14],[120,0],[150,0]];
+const PERIOD = 150;
+function ecgY(t){
+  t = ((t % PERIOD) + PERIOD) % PERIOD;
+  for(let i=0;i<KEYPOINTS.length-1;i++){
+    const [x0,y0] = KEYPOINTS[i], [x1,y1] = KEYPOINTS[i+1];
+    if(t>=x0 && t<=x1){
+      const f = x1===x0 ? 0 : (t-x0)/(x1-x0);
+      return y0 + (y1-y0)*f;
+    }
+  }
+  return 0;
+}
+
+function resizeCanvas(){
+  const wrap = ecgCanvas.parentElement;
+  const dpr = window.devicePixelRatio || 1;
+  ecgCanvas.width = wrap.clientWidth * dpr;
+  ecgCanvas.height = wrap.clientHeight * dpr;
+  ecgCtx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function ecgFlatline(){ ecgFlatlining = true; }
+
+function drawEcg(now){
+  const dt = Math.min(64, now - ecgLastT);
+  ecgLastT = now;
+  const w = ecgCanvas.clientWidth, h = ecgCanvas.clientHeight;
+  const mid = h*0.58;
+  const targetAmp = ecgFlatlining ? 0 : 1;
+  ecgAmp += (targetAmp - ecgAmp) * 0.02;
+  if(ecgFlatlining && ecgAmp < 0.02){ ecgAmp = 0; }
+
+  const speed = 0.09 * ecgUrgency * (h/90);
+  ecgScroll += dt * speed;
+
+  ecgCtx.clearRect(0,0,w,h);
+  ecgCtx.beginPath();
+  ecgCtx.lineWidth = 2;
+  ecgCtx.strokeStyle = ecgFlatlining ? cssVar('--danger') : cssVar('--accent');
+  ecgCtx.lineJoin = 'round';
+  const scaleY = (h/90) * ecgAmp;
+  for(let x=0; x<=w; x+=2){
+    const t = (x + ecgScroll);
+    const y = mid - ecgY(t)*scaleY;
+    if(x===0) ecgCtx.moveTo(x,y); else ecgCtx.lineTo(x,y);
+  }
+  ecgCtx.stroke();
+
+  if(!ecgFlatlining) ecgUrgency += (1 - ecgUrgency) * 0.05;
+  requestAnimationFrame(drawEcg);
+}
+
+resizeCanvas();
+requestAnimationFrame(drawEcg);
+
+/* ------------------------------------------------------------------
+   INIT
+------------------------------------------------------------------- */
+render();
+</script>
+</body>
+</html>
