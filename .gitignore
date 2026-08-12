@@ -1,2 +1,4 @@
 .DS_Store
 pdfs-pendientes/*.pdf
+.venv_sprites/
+assets/processed/
