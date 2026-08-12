@@ -1591,14 +1591,16 @@ function enemySpriteHtml(levelDef, unit, cls){
 
 /* ------------------------------------------------------------------
    REGLAS DE COMBATE
-   El daño por acierto/error es fijo (mismo lenguaje visual en los 10
-   niveles), pero cuántos aciertos hacen falta para vencer YA NO es fijo:
-   depende de cuántas preguntas le tocaron a ese nivel en el reparto de
-   buildLevelPlan() -- ver levelHitsToWin() más abajo.
+   Todo rival tiene SIEMPRE 100 HP (regla fija, no se toca). Lo que se
+   ajusta por nivel es el daño por pregunta (run.qDamage, calculado en
+   startLevel con levelQuestionDamage() -- ver esa función más abajo,
+   junto a buildLevelPlan()): como máximo 20 HP por pregunta (igual en
+   acierto que en error, mismo diseño simétrico original), y menos si el
+   nivel necesita cubrir más de 5 preguntas. MISS_DAMAGE/HIT_DAMAGE ya
+   no existen como constantes globales -- ver run.qDamage.
 ------------------------------------------------------------------- */
-const HIT_DAMAGE    = 20;   // acierto  -> -20 al rival
-const MISS_DAMAGE   = 20;   // error    -> -20 al jugador
-const CRIT_DAMAGE   = 40;   // golpe doble de las clases con racha
+const ENEMY_MAX_HP  = 100;  // fijo, todo rival de todo nivel
+const CRIT_DAMAGE_MULT = 2; // golpe doble de las clases con racha: 2x run.qDamage
 
 const TIME_BY_DIFF = { 1:24000, 2:19000, 3:15000 };
 const NUM_LEVELS = 10;
@@ -1609,7 +1611,7 @@ const NUM_LEVELS = 10;
    (CURRENT_SHARE, diffPlan, drawByDiff, pickQuestionsForLevel) solo se
    usa hoy como red de seguridad de emergencia en continueTurn(), por si
    alguna vez un nivel se quedara sin preguntas propias a mitad de
-   combate -- algo que la fórmula de levelHitsToWin() ya debería impedir.
+   combate -- algo que levelQuestionDamage()/buildLevelPlan() ya deberían impedir.
 ------------------------------------------------------------------- */
 const CURRENT_SHARE = 0.8;
 
@@ -1872,6 +1874,32 @@ function shuffle(arr){
 }
 
 /* ------------------------------------------------------------------
+   MARCADOR: HP DEL RIVAL FIJO, DAÑO POR PREGUNTA AJUSTABLE
+   Regla del juego (no negociable): todo rival tiene SIEMPRE 100 HP. Lo
+   que se ajusta es cuánto quita cada pregunta (correcta o incorrecta,
+   el mismo valor en ambos sentidos, como en el diseño original): como
+   máximo 20 HP -> mínimo 5 preguntas para ganar. Si un nivel necesita
+   cubrir más preguntas que esas 5, el daño baja proporcionalmente para
+   que se necesiten TODAS -- así el "tamaño" del nivel es siempre igual
+   a su número real de preguntas, nunca más ni menos.
+   MIN_LEVEL_QUESTIONS es la otra cara de esa misma regla: ningún nivel
+   puede tener menos de 5 preguntas (si tuviera menos, el daño por
+   pregunta tendría que superar el máximo de 20 para que 100 HP alcance
+   justo). buildLevelPlan() rellena cualquier nivel corto tomando del
+   banco COMPLETO (todos los artículos) antes de aceptar un nivel así.
+------------------------------------------------------------------- */
+const MAX_QUESTION_DAMAGE = 20; // tope de daño por pregunta (acierto o error)
+const MIN_LEVEL_QUESTIONS = ENEMY_MAX_HP / MAX_QUESTION_DAMAGE; // 5: mínimo de preguntas por nivel
+function levelQuestionDamage(deckLen){
+  // Math.ceil, no Math.round: redondear hacia abajo podía dar un daño
+  // insuficiente para que "deckLen" preguntas alcanzaran a bajar los 100
+  // HP (p.ej. 7 preguntas -> round(100/7)=14 -> hacían falta 8 aciertos,
+  // ¡una más de las que el nivel tenía! Con ceil, count*daño siempre es
+  // >=100, así que ceil(100/daño) nunca supera deckLen.
+  return Math.max(1, Math.min(MAX_QUESTION_DAMAGE, Math.ceil(ENEMY_MAX_HP / deckLen)));
+}
+
+/* ------------------------------------------------------------------
    PLAN DE NIVELES DE LA CAMPAÑA
    Reparte TODO el banco del artículo activo entre los 10 niveles, sin
    repetir ninguna pregunta en toda la campaña:
@@ -1886,6 +1914,13 @@ function shuffle(arr){
        verdad) más cualquier pregunta fácil/media que haya sobrado del
        reparto de 1-8 por redondeo -- así se garantiza que se revisa el
        banco COMPLETO del artículo en algún nivel de la aventura.
+     - Relleno: cualquier nivel que quede con menos de MIN_LEVEL_QUESTIONS
+       (porque el artículo no tiene suficientes preguntas de esa
+       dificultad) se completa tomando preguntas de TODO el banco
+       (QUESTIONS, cualquier artículo), preferiendo la misma dificultad
+       si existe, y evitando repetir cualquier id ya usado en otro nivel
+       de este mismo plan. Esas preguntas "prestadas" ya se muestran con
+       la etiqueta "Repaso" en combate (mecanismo existente, `isOther`).
    El plan se calcula una sola vez por campaña (freshCampaign) y se
    guarda en DATA.campaign.levelPlan como arreglos de ids de pregunta,
    para que sea estable durante toda esa partida: reintentar un nivel no
@@ -1943,30 +1978,23 @@ function buildLevelPlan(){
   // para no diluir el carácter "más difícil" del último nivel.
   if(leftover.length) plan[8] = plan[8].concat(leftover);
 
-  return plan.map(qs => qs.map(q => q.id));
-}
+  // Relleno: ningún nivel puede quedar por debajo de MIN_LEVEL_QUESTIONS.
+  // Se completa con el banco COMPLETO (todos los artículos), evitando
+  // repetir cualquier id ya asignado a CUALQUIER nivel de este plan.
+  const usedIds = new Set(plan.flat().map(q => q.id));
+  const targetDiff = [1,1,1,2,2,2,2,2,3,3]; // dificultad "natural" de cada nivel, 0-index
+  plan.forEach((qs, i) => {
+    if(qs.length >= MIN_LEVEL_QUESTIONS) return;
+    const need = MIN_LEVEL_QUESTIONS - qs.length;
+    const candidates = shuffle(QUESTIONS.filter(q => !usedIds.has(q.id)));
+    const sameDiff = candidates.filter(q => q.diff === targetDiff[i]);
+    const otherDiff = candidates.filter(q => q.diff !== targetDiff[i]);
+    const extra = [...sameDiff, ...otherDiff].slice(0, need);
+    extra.forEach(q => usedIds.add(q.id));
+    plan[i] = qs.concat(extra);
+  });
 
-/* Marcador de un nivel, calculado a partir del tamaño de su mazo (ya fijo
-   por buildLevelPlan() -- el contenido manda, no al revés como antes).
-   Reparte esos N preguntas en "aciertos para ganar" y "errores que
-   aguantas" con la MISMA proporción que tenía el diseño original fijo
-   (5 aciertos de un peor-caso de 9 preguntas, 5/9 ≈ 0.56), así que un
-   nivel bien surtido (8-9 preguntas) se siente igual que antes. La
-   resta define missesAllowed de forma que hitsToWin+missesAllowed-1
-   SIEMPRE sea exactamente N -- por construcción nunca hace falta más
-   preguntas que las que el nivel realmente tiene, ni siquiera en el
-   peor caso (fallar todo lo posible antes de acertar lo necesario).
-   Con eso se deriva el daño por error de ESE nivel (dañoRecibido): en
-   niveles cortos (p.ej. sólo 2-3 preguntas difíciles disponibles) cada
-   error pesa más, porque hay menos margen para fallar y aun así ganar. */
-function levelHitsToWin(deckLen){
-  return Math.max(1, Math.min(deckLen, Math.round(deckLen * 5/9)));
-}
-function levelMissesAllowed(deckLen, hitsToWin){
-  return Math.max(1, deckLen - hitsToWin + 1);
-}
-function levelMissDamage(missesAllowed, playerMaxHp){
-  return Math.max(1, Math.ceil(playerMaxHp / missesAllowed));
+  return plan.map(qs => qs.map(q => q.id));
 }
 
 function freshCampaign(){
@@ -2191,17 +2219,18 @@ function startLevel(levelNum){
   if(!DATA.campaign.levelPlan) DATA.campaign.levelPlan = buildLevelPlan();
   const ids = DATA.campaign.levelPlan[levelNum-1] || [];
   // El mazo de un nivel es EXACTAMENTE las preguntas que le tocaron en el
-  // plan -- ya no se arma "para el peor caso" con relleno: el contenido
-  // manda, y el marcador (hitsToWin/HP del rival) se ajusta a su tamaño.
+  // plan (ya relleno a >=MIN_LEVEL_QUESTIONS por buildLevelPlan si hacía
+  // falta). El rival SIEMPRE tiene 100 HP; el daño por pregunta (igual
+  // para acierto y error, como en el diseño original) se ajusta para que
+  // se necesiten exactamente estas preguntas -- nunca más de 20 por
+  // pregunta, así que nunca menos de 5 preguntas por nivel.
   const deck = shuffle(ids.map(id => byId[id]).filter(Boolean));
-  const hitsToWin = levelHitsToWin(deck.length);
-  const missesAllowed = levelMissesAllowed(deck.length, hitsToWin);
-  const missDamage = levelMissDamage(missesAllowed, maxHp);
-  const enemyMaxHp = hitsToWin * HIT_DAMAGE;
+  const qDamage = levelQuestionDamage(deck.length);
+  const hitsToWin = Math.ceil(ENEMY_MAX_HP / qDamage);
   S.run = {
-    levelNum, archetype, def: levelDef, deck, pos:0, hitsToWin, missDamage,
+    levelNum, archetype, def: levelDef, deck, pos:0, hitsToWin, qDamage,
     player: { hp: playerHp, maxHp },
-    enemy: { hp: enemyMaxHp, maxHp: enemyMaxHp },
+    enemy: { hp: ENEMY_MAX_HP, maxHp: ENEMY_MAX_HP },
     freeMissLeft: archetype.freeMiss || 0,
     firstMissUsed: false, // se resetea cada nivel, para el Temple del Forjador
     streak:0, maxStreak:0, correctCount:0, missCount:0,
@@ -2372,16 +2401,17 @@ function handleAnswer(selectedIndex, confidence){
   (q.conceptIds||[]).forEach(cid => SchedulerEngine.schedule(cid));
   run.debriefLog.push({ conceptIds: q.conceptIds, correct, confidence, knowledgeType: q.knowledgeType, difficulty: q.difficulty });
 
-  // Daño fijo: acierto = -20 al rival, error = -20 al jugador.
-  // Modificadores posibles: golpe doble (-40) por racha, bloqueo total del
-  // primer error (Vanguardia) o el primer error amortiguado un 10% (Forjador).
+  // Daño por pregunta = run.qDamage, igual en acierto y error (ajustado
+  // por nivel en startLevel, ver levelQuestionDamage). Modificadores
+  // posibles: golpe doble (2x) por racha, bloqueo total del primer error
+  // (Vanguardia) o el primer error amortiguado un 10% (Forjador).
   let dmg = 0, isCrit = false, blocked = false, reduced = false;
   if(correct){
     run.streak++; run.maxStreak = Math.max(run.maxStreak, run.streak);
     run.correctCount++;
     const cs = run.archetype.critStreak;
     isCrit = cs > 0 && run.streak % cs === 0;
-    dmg = isCrit ? CRIT_DAMAGE : HIT_DAMAGE;
+    dmg = isCrit ? run.qDamage * CRIT_DAMAGE_MULT : run.qDamage;
   } else {
     run.streak = 0;
     run.missCount++;
@@ -2389,9 +2419,9 @@ function handleAnswer(selectedIndex, confidence){
       run.freeMissLeft--; blocked = true; dmg = 0;
     } else if(!run.firstMissUsed && run.archetype.firstMissDiscount > 0){
       run.firstMissUsed = true; reduced = true;
-      dmg = Math.round(run.missDamage * (1 - run.archetype.firstMissDiscount));
+      dmg = Math.round(run.qDamage * (1 - run.archetype.firstMissDiscount));
     } else {
-      dmg = run.missDamage;
+      dmg = run.qDamage;
     }
     if(!DATA.campaign.failedQuestionIds.includes(q.id)) DATA.campaign.failedQuestionIds.push(q.id);
   }
@@ -2438,8 +2468,8 @@ function continueTurn(){
   if(run.enemy.hp <= 0){ triggerKO('enemyBadge'); setTimeout(handleVictory, 550); return; }
   if(run.player.hp <= 0){ triggerKO('playerBadge'); setTimeout(handleDefeat, 550); return; }
   run.pos++;
-  // levelHitsToWin() garantiza matemáticamente que el mazo alcanza para
-  // que el combate SIEMPRE se decida (victoria o derrota) antes de
+  // levelQuestionDamage() garantiza matemáticamente que el mazo alcanza
+  // para que el combate SIEMPRE se decida (victoria o derrota) antes de
   // quedarse sin preguntas -- esto de aquí no debería disparar nunca.
   // Se deja como red de seguridad; si llegara a pasar, puede repetir
   // alguna pregunta ya vista (mejor eso que trabar el combate).
@@ -2458,10 +2488,11 @@ function handleVictory(){
   const run = S.run;
   clearInterval(run.timerId);
   DATA.campaign.levelsCleared[run.levelNum-1] = true;
-  // La curación se redondea a múltiplos de 20 para que el HP siempre
-  // represente un número exacto de errores restantes.
+  // La curación se redondea a múltiplos de MAX_QUESTION_DAMAGE (20) para
+  // que el HP quede en un número "limpio", igual que el tope de daño por
+  // pregunta -- ya no depende de cuánto restó esta pelea en particular.
   const healPct = 0.20 + (run.archetype.healBonus||0);
-  const heal = Math.max(MISS_DAMAGE, Math.round(run.player.maxHp*healPct / MISS_DAMAGE) * MISS_DAMAGE);
+  const heal = Math.max(MAX_QUESTION_DAMAGE, Math.round(run.player.maxHp*healPct / MAX_QUESTION_DAMAGE) * MAX_QUESTION_DAMAGE);
   DATA.campaign.playerHp = Math.min(run.player.maxHp, run.player.hp + heal);
   if(run.levelNum >= 10) DATA.campaign.completed = true;
   saveData();
@@ -2878,7 +2909,7 @@ function screenBattle(){
     feedback = structuredFeedbackHtml(run, q, view);
   }
 
-  const hitsLeft = Math.ceil(run.enemy.hp / HIT_DAMAGE);
+  const hitsLeft = Math.ceil(run.enemy.hp / run.qDamage);
   const isOther = q.article !== CURRENT_ARTICLE;
 
   return `
@@ -3391,8 +3422,8 @@ function screenHome(){
     <div class="card-panel" style="margin-top:12px;">
       <div class="eyebrow" style="margin:0 0 6px;">Cómo funciona el combate</div>
       <ul class="rules">
-        <li>Cada respuesta correcta le quita <b>${HIT_DAMAGE} HP</b> al rival. Los aciertos que necesitas para vencerlo dependen de cuántas preguntas tenga ese nivel.</li>
-        <li>Cada respuesta incorrecta también te quita HP -- cuánto exactamente depende del nivel: en niveles con pocas preguntas, cada error pesa más porque hay menos margen para fallar y aun así ganar.</li>
+        <li>Cada rival tiene siempre <b>${ENEMY_MAX_HP} HP</b>. Cada pregunta (acierto o error) quita lo mismo: hasta <b>${MAX_QUESTION_DAMAGE} HP</b>, menos si el nivel necesita cubrir más de ${MIN_LEVEL_QUESTIONS} preguntas -- así el combate siempre dura exactamente lo que ese nivel tenga que enseñarte.</li>
+        <li>Si el artículo activo no tiene suficientes preguntas de alguna dificultad, ese nivel se completa con preguntas de repaso de otros artículos (marcadas como "Repaso").</li>
         <li>Los niveles 1-8 suben en dificultad (fácil → media); los niveles 9 y 10 concentran las preguntas más difíciles y cualquier pregunta que aún no hayas visto.</li>
       </ul>
     </div>
