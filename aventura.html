@@ -217,8 +217,8 @@
   .q-meta{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 
   /* ---- marcador de aciertos del combate ---- */
-  .hit-track{ display:flex; align-items:center; gap:6px; margin:10px 0 4px; }
-  .hit-track span{ width:26px; height:8px; background:var(--border); border:1px solid var(--border); }
+  .hit-track{ display:flex; align-items:center; gap:6px; margin:10px 0 4px; flex-wrap:wrap; }
+  .hit-track span{ width:18px; height:8px; background:var(--border); border:1px solid var(--border); }
   .hit-track span.on{ background:var(--danger); border-color:var(--danger); }
   .hit-track-label{ width:auto !important; height:auto !important; background:none !important; border:none !important;
     font-family:var(--mono); font-size:10.5px; color:var(--ink-muted); letter-spacing:.06em; margin-left:4px; }
@@ -257,13 +257,12 @@
   .ficha-exp{ font-family:var(--serif); font-size:14px; line-height:1.6; }
   .ficha-ref{ font-family:var(--mono); font-size:11.5px; line-height:1.6; color:var(--ink-muted); }
 
-  /* ---- cobertura del artículo ---- */
+  /* ---- cobertura del artículo (preguntas por nivel, 10 columnas) ---- */
   .coverage{ margin-top:12px; }
-  .coverage-bar{ height:8px; background:var(--border); overflow:hidden; }
-  .coverage-fill{ height:100%; transition:width .4s ease; }
-  .coverage-fill.full{ background:var(--success); }
-  .coverage-fill.mid{ background:var(--gold); }
-  .coverage-fill.low{ background:var(--danger); }
+  .coverage-levels{ display:flex; align-items:flex-end; gap:4px; height:44px; margin-top:8px; }
+  .coverage-level{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; height:100%; }
+  .coverage-level-fill{ width:100%; background:var(--gold); border-radius:2px 2px 0 0; }
+  .coverage-level span{ font-family:var(--mono); font-size:9px; color:var(--ink-muted); }
   .coverage-line{ font-family:var(--mono); font-size:11px; line-height:1.7; margin-top:6px;
     display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
   .rules{ margin:0; padding-left:18px; font-size:13px; line-height:1.7; }
@@ -1479,49 +1478,28 @@ function enemySpriteHtml(levelDef, unit, cls){
 }
 
 /* ------------------------------------------------------------------
-   REGLAS DE COMBATE (fijas, iguales en los 10 niveles)
+   REGLAS DE COMBATE
+   El daño por acierto/error es fijo (mismo lenguaje visual en los 10
+   niveles), pero cuántos aciertos hacen falta para vencer YA NO es fijo:
+   depende de cuántas preguntas le tocaron a ese nivel en el reparto de
+   buildLevelPlan() -- ver levelHitsToWin() más abajo.
 ------------------------------------------------------------------- */
-const ENEMY_MAX_HP  = 100;  // todos los rivales tienen 100 HP
 const HIT_DAMAGE    = 20;   // acierto  -> -20 al rival
 const MISS_DAMAGE   = 20;   // error    -> -20 al jugador
 const CRIT_DAMAGE   = 40;   // golpe doble de las clases con racha
-const HITS_TO_WIN   = ENEMY_MAX_HP / HIT_DAMAGE;   // 5 aciertos limpios
 
 const TIME_BY_DIFF = { 1:24000, 2:19000, 3:15000 };
 const NUM_LEVELS = 10;
 
-/* Cuántas preguntas puede llegar a consumir UN nivel en el peor caso:
-   el combate termina cuando alguien llega a 0, así que el máximo es
-   (errores que aguanta el jugador) + (aciertos necesarios) - 1. */
-const missesToDie = (maxHp) => Math.ceil(maxHp / MISS_DAMAGE);
-const maxQuestionsForLevel = (maxHp) => missesToDie(maxHp) + HITS_TO_WIN - 1;
-
 /* ------------------------------------------------------------------
-   MEZCLA 80/20
-   Cada nivel se arma con 80% de preguntas del artículo en estudio y
-   20% de preguntas de OTROS artículos que ya estén en el cuaderno de
-   repaso (es decir, que el jugador ya haya visto alguna vez). Si aún
-   no hay historial de otros artículos, el nivel se llena 100% con el
-   artículo actual.
+   MEZCLA 80/20 -- YA NO ARMA LOS NIVELES NORMALES (eso lo hace
+   buildLevelPlan(), ver más abajo). Lo que queda de esta lógica
+   (CURRENT_SHARE, diffPlan, drawByDiff, pickQuestionsForLevel) solo se
+   usa hoy como red de seguridad de emergencia en continueTurn(), por si
+   alguna vez un nivel se quedara sin preguntas propias a mitad de
+   combate -- algo que la fórmula de levelHitsToWin() ya debería impedir.
 ------------------------------------------------------------------- */
 const CURRENT_SHARE = 0.8;
-
-/* ------------------------------------------------------------------
-   ALGORITMO DE PRESUPUESTO DE PREGUNTAS
-   Determina cuántas preguntas hay que redactar para un artículo nuevo
-   para poder jugar los 10 niveles SIN repetir ninguna pregunta, incluso
-   en el peor caso (la clase con más HP fallando casi todo).
-   Se usa en la pantalla de inicio para saber si un artículo alcanza.
-------------------------------------------------------------------- */
-function questionBudget(maxHp){
-  const hp = maxHp || MAX_ARCHETYPE_HP;
-  const perLevel   = maxQuestionsForLevel(hp);           // peor caso por nivel
-  const campaign   = perLevel * NUM_LEVELS;              // peor caso total
-  const fromCurrent= Math.ceil(campaign * CURRENT_SHARE);// cuota del artículo activo
-  const fromOthers = campaign - fromCurrent;             // cuota de repaso mezclado
-  const typical    = Math.ceil((HITS_TO_WIN + 2) * NUM_LEVELS * CURRENT_SHARE);
-  return { perLevelMax:perLevel, campaignMax:campaign, needCurrent:fromCurrent, needOthers:fromOthers, comfortable:typical, minimum:HITS_TO_WIN*NUM_LEVELS };
-}
 
 /* Reparto de dificultad por nivel: pesos [fácil, media, difícil].
    La curva sube de nivel 1 (casi todo fácil) a nivel 10 (casi todo difícil). */
@@ -1775,8 +1753,112 @@ const activeQuestions = () => QUESTIONS.filter(q => q.article === CURRENT_ARTICL
 const articleRef  = (q) => { const a = articleById(q.article); return a ? a.ref : ''; };
 const articleName = (q) => { const a = articleById(q.article); return a ? (a.short || a.name) : q.article; };
 
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+/* ------------------------------------------------------------------
+   PLAN DE NIVELES DE LA CAMPAÑA
+   Reparte TODO el banco del artículo activo entre los 10 niveles, sin
+   repetir ninguna pregunta en toda la campaña:
+     - Niveles 1-8: reparto ESTRICTO por dificultad -- cada uno de estos
+       niveles saca preguntas de una sola dificultad (fácil o media,
+       nunca mezcladas), en progresión. El punto de corte entre "niveles
+       fáciles" y "niveles medios" no es fijo: se calcula proporcional a
+       cuántas preguntas hay de cada dificultad en el artículo, para que
+       se adapte a cualquier banco sin dejar niveles vacíos.
+     - Niveles 9 y 10 son la EXCEPCIÓN: se llevan todo lo difícil (con el
+       nivel 10 quedándose la mayor parte, para que sea el más difícil de
+       verdad) más cualquier pregunta fácil/media que haya sobrado del
+       reparto de 1-8 por redondeo -- así se garantiza que se revisa el
+       banco COMPLETO del artículo en algún nivel de la aventura.
+   El plan se calcula una sola vez por campaña (freshCampaign) y se
+   guarda en DATA.campaign.levelPlan como arreglos de ids de pregunta,
+   para que sea estable durante toda esa partida: reintentar un nivel no
+   le cambia las preguntas.
+------------------------------------------------------------------- */
+function splitCounts(total, buckets){
+  // Reparte `total` unidades entre `buckets` grupos lo más parejo posible
+  // (el resto de la división se reparte de a uno entre los primeros).
+  if(buckets <= 0) return [];
+  const base = Math.floor(total / buckets);
+  let rem = total - base*buckets;
+  return Array.from({length:buckets}, () => {
+    const extra = rem > 0 ? 1 : 0;
+    if(rem > 0) rem--;
+    return base + extra;
+  });
+}
+
+function buildLevelPlan(){
+  const pool = shuffle(activeQuestions());
+  const byDiff = { 1:[], 2:[], 3:[] };
+  pool.forEach(q => byDiff[q.diff].push(q));
+  const easy = byDiff[1], mid = byDiff[2], hard = byDiff[3];
+
+  const plan = Array.from({length:10}, () => []);
+  let leftover = [];
+
+  function distribute(levels, questions){
+    if(!levels.length){ leftover = leftover.concat(questions); return; }
+    const counts = splitCounts(questions.length, levels.length);
+    let idx = 0;
+    levels.forEach((lvl,i) => { plan[lvl-1] = questions.slice(idx, idx+counts[i]); idx += counts[i]; });
+  }
+
+  // Niveles 1-8: cuántos son "fáciles" vs "medios" depende de cuánto
+  // contenido hay de cada dificultad (nunca deja un tramo vacío si el
+  // otro sí tiene preguntas).
+  const firstEight = [1,2,3,4,5,6,7,8];
+  const easyMidTotal = easy.length + mid.length;
+  let easyLevelCount;
+  if(easyMidTotal === 0) easyLevelCount = 0;
+  else if(mid.length === 0) easyLevelCount = 8;
+  else if(easy.length === 0) easyLevelCount = 0;
+  else easyLevelCount = Math.min(7, Math.max(1, Math.round(8 * easy.length / easyMidTotal)));
+  distribute(firstEight.slice(0, easyLevelCount), easy);
+  distribute(firstEight.slice(easyLevelCount), mid);
+
+  // Niveles 9-10: todo lo difícil, con el 10 llevándose ~60% (el resto,
+  // el 9) para que el último nivel sea el más difícil de la aventura.
+  const n10 = Math.ceil(hard.length * 0.6);
+  plan[9] = hard.slice(hard.length - n10);     // nivel 10: lo más difícil
+  plan[8] = hard.slice(0, hard.length - n10);  // nivel 9: el resto de lo difícil
+
+  // Sobrantes del reparto 1-8 (por redondeo) van al nivel 9, no al 10,
+  // para no diluir el carácter "más difícil" del último nivel.
+  if(leftover.length) plan[8] = plan[8].concat(leftover);
+
+  return plan.map(qs => qs.map(q => q.id));
+}
+
+/* Marcador de un nivel, calculado a partir del tamaño de su mazo (ya fijo
+   por buildLevelPlan() -- el contenido manda, no al revés como antes).
+   Reparte esos N preguntas en "aciertos para ganar" y "errores que
+   aguantas" con la MISMA proporción que tenía el diseño original fijo
+   (5 aciertos de un peor-caso de 9 preguntas, 5/9 ≈ 0.56), así que un
+   nivel bien surtido (8-9 preguntas) se siente igual que antes. La
+   resta define missesAllowed de forma que hitsToWin+missesAllowed-1
+   SIEMPRE sea exactamente N -- por construcción nunca hace falta más
+   preguntas que las que el nivel realmente tiene, ni siquiera en el
+   peor caso (fallar todo lo posible antes de acertar lo necesario).
+   Con eso se deriva el daño por error de ESE nivel (dañoRecibido): en
+   niveles cortos (p.ej. sólo 2-3 preguntas difíciles disponibles) cada
+   error pesa más, porque hay menos margen para fallar y aun así ganar. */
+function levelHitsToWin(deckLen){
+  return Math.max(1, Math.min(deckLen, Math.round(deckLen * 5/9)));
+}
+function levelMissesAllowed(deckLen, hitsToWin){
+  return Math.max(1, deckLen - hitsToWin + 1);
+}
+function levelMissDamage(missesAllowed, playerMaxHp){
+  return Math.max(1, Math.ceil(playerMaxHp / missesAllowed));
+}
+
 function freshCampaign(){
-  return { levelsCleared: Array(10).fill(false), playerHp: null, usedQuestionIds: [], failedQuestionIds: [], completed:false, articleTag: CURRENT_ARTICLE };
+  return { levelsCleared: Array(10).fill(false), playerHp: null, usedQuestionIds: [], failedQuestionIds: [], completed:false, articleTag: CURRENT_ARTICLE, levelPlan: buildLevelPlan() };
 }
 function loadData(){
   try{
@@ -1901,11 +1983,6 @@ function deckStats(){
   };
 }
 
-function shuffle(arr){
-  const a = arr.slice();
-  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
-  return a;
-}
 function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 /* Preguntas de OTROS artículos que el jugador ya estudió alguna vez
@@ -1936,7 +2013,7 @@ function drawByDiff(pool, want, taken){
      · respeta la curva de dificultad del nivel
      · mezcla 80% artículo actual / 20% artículos ya estudiados */
 function pickQuestionsForLevel(levelNum, excludeIds, count){
-  const n = count || maxQuestionsForLevel(MAX_ARCHETYPE_HP);
+  const n = count;
   const excluded = new Set(excludeIds || []);
   const taken = new Set();
 
@@ -1966,24 +2043,25 @@ function pickQuestionsForLevel(levelNum, excludeIds, count){
   return shuffle(chosen);
 }
 
-/* Diagnóstico de cobertura: cuántas preguntas tiene un artículo frente a
-   las que necesitaría para cubrir los 10 niveles sin repetir. */
+/* Ya no se trata de "¿alcanza el banco para no repetir?" -- buildLevelPlan()
+   siempre reparte TODO lo que haya, sin repetir nunca, aunque eso implique
+   niveles cortos. Esta función arma un plan de vista previa (no toca
+   DATA.campaign) solo para mostrar en la pantalla de inicio cómo quedaría
+   ese reparto: cuántas preguntas caerían en cada nivel. */
 function articleCoverage(articleId){
+  // articleId siempre es CURRENT_ARTICLE en la práctica (única forma en que
+  // se llama hoy) -- buildLevelPlan() lee esa constante directamente.
   const art = articleById(articleId);
   const qs_ = QUESTIONS.filter(q => q.article === articleId);
-  const budget = questionBudget(MAX_ARCHETYPE_HP);
   const byDiff = { 1:0, 2:0, 3:0 };
   const byKind = { directa:0, caso:0 };
   qs_.forEach(q => { byDiff[q.diff]++; byKind[q.kind]++; });
-  // Con la mezcla 80/20, cada nivel consume ~80% de su mazo del artículo activo.
-  const perLevelFromArticle = Math.max(1, Math.round(budget.perLevelMax * CURRENT_SHARE));
+  const perLevel = buildLevelPlan().map(ids => ids.length);
   return {
     name: art ? art.name : articleId,
     have: qs_.length,
-    need: budget.needCurrent,
-    comfortable: budget.comfortable,
-    levelsCovered: Math.min(NUM_LEVELS, Math.floor(qs_.length / perLevelFromArticle)),
-    byDiff, byKind, budget,
+    byDiff, byKind, perLevel,
+    minPerLevel: Math.min(...perLevel), maxPerLevel: Math.max(...perLevel),
   };
 }
 
@@ -1995,13 +2073,23 @@ function startLevel(levelNum){
   const maxHp = archetype.hp;
   const playerHp = DATA.campaign.playerHp != null ? Math.min(DATA.campaign.playerHp, maxHp) : maxHp;
   const levelDef = LEVELS[levelNum-1];
-  // El mazo se arma completo para el peor caso del nivel: así nunca hay
-  // que rellenarlo a mitad del combate y jamás se repite una pregunta.
-  const deck = pickQuestionsForLevel(levelNum, DATA.campaign.usedQuestionIds, maxQuestionsForLevel(maxHp));
+  // Migración: partidas guardadas antes de que existiera el plan de
+  // niveles por dificultad todavía no tienen levelPlan -- se arma aquí
+  // mismo la primera vez que hace falta, sin perder el progreso ya hecho.
+  if(!DATA.campaign.levelPlan) DATA.campaign.levelPlan = buildLevelPlan();
+  const ids = DATA.campaign.levelPlan[levelNum-1] || [];
+  // El mazo de un nivel es EXACTAMENTE las preguntas que le tocaron en el
+  // plan -- ya no se arma "para el peor caso" con relleno: el contenido
+  // manda, y el marcador (hitsToWin/HP del rival) se ajusta a su tamaño.
+  const deck = shuffle(ids.map(id => byId[id]).filter(Boolean));
+  const hitsToWin = levelHitsToWin(deck.length);
+  const missesAllowed = levelMissesAllowed(deck.length, hitsToWin);
+  const missDamage = levelMissDamage(missesAllowed, maxHp);
+  const enemyMaxHp = hitsToWin * HIT_DAMAGE;
   S.run = {
-    levelNum, archetype, def: levelDef, deck, pos:0,
+    levelNum, archetype, def: levelDef, deck, pos:0, hitsToWin, missDamage,
     player: { hp: playerHp, maxHp },
-    enemy: { hp: ENEMY_MAX_HP, maxHp: ENEMY_MAX_HP },
+    enemy: { hp: enemyMaxHp, maxHp: enemyMaxHp },
     freeMissLeft: archetype.freeMiss || 0,
     firstMissUsed: false, // se resetea cada nivel, para el Temple del Forjador
     streak:0, maxStreak:0, correctCount:0, missCount:0,
@@ -2189,9 +2277,9 @@ function handleAnswer(selectedIndex, confidence){
       run.freeMissLeft--; blocked = true; dmg = 0;
     } else if(!run.firstMissUsed && run.archetype.firstMissDiscount > 0){
       run.firstMissUsed = true; reduced = true;
-      dmg = Math.round(MISS_DAMAGE * (1 - run.archetype.firstMissDiscount));
+      dmg = Math.round(run.missDamage * (1 - run.archetype.firstMissDiscount));
     } else {
-      dmg = MISS_DAMAGE;
+      dmg = run.missDamage;
     }
     if(!DATA.campaign.failedQuestionIds.includes(q.id)) DATA.campaign.failedQuestionIds.push(q.id);
   }
@@ -2238,8 +2326,11 @@ function continueTurn(){
   if(run.enemy.hp <= 0){ triggerKO('enemyBadge'); setTimeout(handleVictory, 550); return; }
   if(run.player.hp <= 0){ triggerKO('playerBadge'); setTimeout(handleDefeat, 550); return; }
   run.pos++;
-  // El mazo ya viene dimensionado para el peor caso; esto es solo una red
-  // de seguridad por si el banco de preguntas fuera muy pequeño.
+  // levelHitsToWin() garantiza matemáticamente que el mazo alcanza para
+  // que el combate SIEMPRE se decida (victoria o derrota) antes de
+  // quedarse sin preguntas -- esto de aquí no debería disparar nunca.
+  // Se deja como red de seguridad; si llegara a pasar, puede repetir
+  // alguna pregunta ya vista (mejor eso que trabar el combate).
   if(run.pos >= run.deck.length){
     const seen = new Set(run.deck.map(q => q.id));
     const more = pickQuestionsForLevel(run.levelNum, Array.from(seen), 3);
@@ -2684,7 +2775,7 @@ function screenBattle(){
       ${combatantBlock('enemy', run)}
       ${combatantBlock('player', run)}
     </div>
-    <div class="hit-track">${Array.from({length:HITS_TO_WIN}).map((_,i)=>`<span class="${i < HITS_TO_WIN-hitsLeft ? 'on':''}"></span>`).join('')}
+    <div class="hit-track">${Array.from({length:run.hitsToWin}).map((_,i)=>`<span class="${i < run.hitsToWin-hitsLeft ? 'on':''}"></span>`).join('')}
       <span class="hit-track-label">${hitsLeft} acierto${hitsLeft===1?'':'s'} para vencer</span>
     </div>
     <div class="card-panel">
@@ -3085,22 +3176,25 @@ function screenStudy(){
    para saber de un vistazo si el artículo tiene suficientes preguntas. */
 function coverageHtml(articleId){
   const c = articleCoverage(articleId);
-  const pct = Math.min(100, Math.round(c.have / c.need * 100));
-  const ok = c.have >= c.need;
-  const okish = !ok && c.have >= c.comfortable;
+  const maxN = Math.max(1, c.maxPerLevel);
+  const bars = c.perLevel.map((n,i) => `
+    <div class="coverage-level" title="Nivel ${i+1}: ${n} pregunta${n===1?'':'s'}">
+      <div class="coverage-level-fill" style="height:${n===0?2:Math.max(6, Math.round(n/maxN*28))}px;"></div>
+      <span>${i+1}</span>
+    </div>`).join('');
   return `
     <div class="coverage">
-      <div class="coverage-bar"><div class="coverage-fill ${ok?'full':okish?'mid':'low'}" style="width:${pct}%;"></div></div>
       <div class="coverage-line">
-        <b>${c.have}</b> de <b>${c.need}</b> preguntas para cubrir los 10 niveles sin repetir
-        ${ok ? '<span class="pill pill-ok">Completo</span>' : okish ? '<span class="pill pill-mid">Jugable</span>' : '<span class="pill pill-low">Faltan '+(c.comfortable-c.have>0?c.comfortable-c.have:c.need-c.have)+'</span>'}
+        <b>${c.have}</b> preguntas repartidas en los 10 niveles, sin repetir ninguna
+        <span class="pill pill-ok">Completo</span>
       </div>
+      <div class="coverage-levels">${bars}</div>
       <div class="coverage-line muted">
-        Fácil ${c.byDiff[1]} · Media ${c.byDiff[2]} · Difícil ${c.byDiff[3]} &nbsp;|&nbsp;
+        Fácil ${c.byDiff[1]} · Media ${c.byDiff[2]} · Difícil ${c.byDiff[3]} (niveles 9-10) &nbsp;|&nbsp;
         Directas ${c.byKind.directa} · Casos ${c.byKind.caso}
       </div>
       <div class="coverage-line muted">
-        Peor caso: ${c.budget.perLevelMax} preguntas por nivel · ${c.budget.campaignMax} en la campaña completa.
+        De ${c.minPerLevel} a ${c.maxPerLevel} preguntas por nivel, según cuántas haya de cada dificultad.
       </div>
     </div>`;
 }
@@ -3185,8 +3279,9 @@ function screenHome(){
     <div class="card-panel" style="margin-top:12px;">
       <div class="eyebrow" style="margin:0 0 6px;">Cómo funciona el combate</div>
       <ul class="rules">
-        <li>Cada rival tiene <b>${ENEMY_MAX_HP} HP</b>. Cada respuesta correcta le quita <b>${HIT_DAMAGE}</b> → <b>${HITS_TO_WIN} aciertos</b> para vencerlo.</li>
-        <li>Cada respuesta incorrecta te quita <b>${MISS_DAMAGE} HP</b>. Tu clase decide cuántos errores aguantas.</li>
+        <li>Cada respuesta correcta le quita <b>${HIT_DAMAGE} HP</b> al rival. Los aciertos que necesitas para vencerlo dependen de cuántas preguntas tenga ese nivel.</li>
+        <li>Cada respuesta incorrecta también te quita HP -- cuánto exactamente depende del nivel: en niveles con pocas preguntas, cada error pesa más porque hay menos margen para fallar y aun así ganar.</li>
+        <li>Los niveles 1-8 suben en dificultad (fácil → media); los niveles 9 y 10 concentran las preguntas más difíciles y cualquier pregunta que aún no hayas visto.</li>
       </ul>
     </div>
     <div class="section" style="margin-top:16px;">
