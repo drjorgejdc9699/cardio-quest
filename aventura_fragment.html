@@ -249,6 +249,12 @@
   .coverage-level span{ font-family:var(--mono); font-size:9px; color:var(--ink-muted); }
   .coverage-line{ font-family:var(--mono); font-size:11px; line-height:1.7; margin-top:6px;
     display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  /* ---- barra horizontal genérica (dominio del Codex, etc.) ---- */
+  .mini-bar{ height:8px; background:var(--border); overflow:hidden; border-radius:2px; }
+  .mini-bar-fill{ height:100%; transition:width .4s ease; }
+  .mini-bar-fill.full{ background:var(--success); }
+  .mini-bar-fill.mid{ background:var(--gold); }
+  .mini-bar-fill.low{ background:var(--danger); }
   .rules{ margin:0; padding-left:18px; font-size:13px; line-height:1.7; }
   .rules li{ margin-bottom:4px; }
   .dmg-pop.block{ color:var(--gold); font-size:13px; }
@@ -1296,6 +1302,56 @@ const DIRECTED_PAIRS = [
   { id:'dp-ecop-3', topic:'ecopediatrica', prompt:'Significado de una puntuación Z de +2 o -2', answer:'Dos desviaciones estándar por encima o debajo de la media' },
   { id:'dp-ecop-4', topic:'ecopediatrica', prompt:'Contraste en aurícula izquierda dentro de 3-6 ciclos cardiacos', answer:'Derivación interauricular' },
   { id:'dp-ecop-5', topic:'ecopediatrica', prompt:'Contraste en aurícula izquierda después de 6 ciclos cardiacos', answer:'Derivación intrapulmonar' },
+];
+
+/* ------------------------------------------------------------------
+   TARJETAS DE ASOCIACIÓN CLÍNICA (por artículo)
+   A diferencia de DIRECTED_PAIRS (hechos generales, sin artículo
+   específico), estas tarjetas se generan por artículo cargado, siguiendo
+   el estándar de "asociaciones contextualizadas" (nunca reglas
+   absolutas/desnudas) -- ver memoria cardioaventura-association-cards-standard.
+   Se muestran en su propia pestaña del Cuaderno y alimentan Doble Hélice
+   junto con DIRECTED_PAIRS. Forma: {id, articleId, section, prompt, answer}.
+------------------------------------------------------------------- */
+const ASSOCIATION_CARDS = [
+  { id:'assoc-dorv-1', articleId:'dorv-review', section:'Definiciones', prompt:'Definición de DORV según STS/EACTS (2000)', answer:'Más del 50% de la aorta cabalga el ventrículo derecho, sin importar si hay infundíbulo bilateral o discontinuidad mitroaórtica' },
+  { id:'assoc-dorv-2', articleId:'dorv-review', section:'Definiciones', prompt:'Doble salida del ventrículo izquierdo (DOLV)', answer:'Ambas grandes arterias se originan predominantemente del VI; representa menos del 5% de los corazones con doble salida' },
+  { id:'assoc-dorv-3', articleId:'dorv-review', section:'Definiciones', prompt:'Doble salida de ambos ventrículos (DOBV)', answer:'Ambas raíces arteriales cabalgan por igual la cresta del tabique muscular apical, sin septum de salida -- el más raro de los tres' },
+  { id:'assoc-dorv-4', articleId:'dorv-review', section:'Definiciones', prompt:'Corazón de Taussig-Bing', answer:'DORV con aorta originada del ventrículo derecho y comunicación interventricular subpulmonar (fisiología tipo transposición)' },
+  { id:'assoc-dorv-5', articleId:'dorv-review', section:'Definiciones', prompt:'DORV con aorta del VD y CIV subpulmonar, sin CIV subaórtica', answer:'Se reconoce como corazón de Taussig-Bing' },
+  { id:'assoc-dorv-6', articleId:'dorv-review', section:'Definiciones', prompt:'Regla del \'150%\' en doble salida del ventrículo derecho', answer:'Suma el 100% de una gran arteria más el 50% de la otra cuando ambas surgen predominantemente del VD' },
+  { id:'assoc-dorv-7', articleId:'dorv-review', section:'Clasificación', prompt:'En DORV, CIV subaórtica aislada, sin estenosis pulmonar asociada', answer:'Patrón tipo CIV simple, con buen pronóstico a largo plazo' },
+  { id:'assoc-dorv-8', articleId:'dorv-review', section:'Clasificación', prompt:'En DORV, CIV subaórtica + estenosis subpulmonar asociada', answer:'Sugiere fisiología tipo Tetralogía de Fallot (DORV-TOF)' },
+  { id:'assoc-dorv-9', articleId:'dorv-review', section:'Clasificación', prompt:'Fisiología tipo Fallot en doble salida del ventrículo derecho', answer:'Se debe típicamente a CIV subaórtica con estenosis subpulmonar asociada' },
+  { id:'assoc-dorv-10', articleId:'dorv-review', section:'Clasificación', prompt:'En DORV, CIV subpulmonar sin CIV subaórtica', answer:'Patrón tipo transposición (corazón de Taussig-Bing)' },
+  { id:'assoc-dorv-11', articleId:'dorv-review', section:'Clasificación', prompt:'CIV en DORV que no puede clasificarse como subaórtica, subpulmonar ni doblemente comprometida', answer:'Se llama CIV no comprometida (remota); su límite depende del juicio quirúrgico sobre la longitud del infundíbulo, no de una medida fija' },
+  { id:'assoc-dorv-12', articleId:'dorv-review', section:'Clasificación', prompt:'DORV con CIV no comprometida (remota)', answer:'Tiene el peor pronóstico de los cuatro tipos principales: supervivencia a 5 años 83.6%-87.1%' },
+  { id:'assoc-dorv-13', articleId:'dorv-review', section:'Diagnóstico diferencial', prompt:'En DORV con CIV subpulmonar tipo Taussig-Bing, obstrucción subaórtica asociada', answer:'Sugiere coartación aórtica severa, hipoplasia tubular o interrupción del arco aórtico' },
+  { id:'assoc-dorv-14', articleId:'dorv-review', section:'Diagnóstico diferencial', prompt:'Recién nacido con DORV, defecto septal auriculoventricular, isomerismo derecho y asplenia', answer:'Sugiere DORV-defecto septal auriculoventricular-heterotaxia, el subtipo de peor pronóstico' },
+  { id:'assoc-dorv-15', articleId:'dorv-review', section:'Diagnóstico diferencial', prompt:'DORV-defecto septal auriculoventricular-heterotaxia', answer:'Se asocia con frecuencia a conexión venosa pulmonar anómala total y vena cava superior izquierda persistente' },
+  { id:'assoc-dorv-16', articleId:'dorv-review', section:'Diagnóstico diferencial', prompt:'Cabalgamiento (straddling) significativo de una válvula auriculoventricular sobre la CIV en doble salida ventricular', answer:'Puede impedir lograr una reparación biventricular completa' },
+  { id:'assoc-dorv-17', articleId:'dorv-review', section:'Diagnóstico diferencial', prompt:'En doble salida del ventrículo izquierdo, arteria descendente anterior que cruza el tracto de salida pulmonar', answer:'Puede limitar el acceso quirúrgico durante la reparación intraventricular' },
+  { id:'assoc-dorv-18', articleId:'dorv-review', section:'Diagnóstico diferencial', prompt:'Solo 23% de una serie de 100 especímenes con DORV mostró este hallazgo', answer:'Infundíbulo bilateral (coni bilaterales) -- ya no se exige como criterio diagnóstico' },
+  { id:'assoc-dorv-19', articleId:'dorv-review', section:'Pronóstico', prompt:'Supervivencia a 10 años en DORV tipo CIV, tipo Fallot y tipo transposición', answer:'89.5%-95.2%' },
+  { id:'assoc-dorv-20', articleId:'dorv-review', section:'Pronóstico', prompt:'Supervivencia a 5 años en DORV con CIV no comprometida', answer:'83.6%-87.1%, la más baja de los tipos principales de DORV' },
+  { id:'assoc-dorv-21', articleId:'dorv-review', section:'Pronóstico', prompt:'Subtipo de doble salida ventricular con peor pronóstico de todos', answer:'DORV-defecto septal auriculoventricular-heterotaxia' },
+  { id:'assoc-dorv-22', articleId:'dorv-review', section:'Imagen', prompt:'Modalidad de imagen definitiva de primera línea para diagnosticar doble salida ventricular', answer:'Ecocardiografía' },
+  { id:'assoc-dorv-23', articleId:'dorv-review', section:'Imagen', prompt:'Ecocardiografía fetal tridimensional en sospecha prenatal de DORV', answer:'Mejora la caracterización anatómica para decidir el abordaje quirúrgico posnatal' },
+  { id:'assoc-dorv-24', articleId:'dorv-review', section:'Imagen', prompt:'Incertidumbre diagnóstica significativa tras la ecocardiografía en doble salida ventricular', answer:'Indicación de tomografía computada cardiaca, pese a implicar radiación ionizante' },
+  { id:'assoc-dorv-25', articleId:'dorv-review', section:'Imagen', prompt:'Neonato con doble salida ventricular que necesita ver el trayecto coronario COMPLETO sin sedación', answer:'Tomografía computada -- permite adquisición 3D con respiración libre, sin anestesia' },
+  { id:'assoc-dorv-26', articleId:'dorv-review', section:'Imagen', prompt:'Generación de modelos 3D impresos o virtuales para planeación quirúrgica en doble salida ventricular', answer:'Se hace de forma óptima con tomografía computada, por su resolución espacial y de contraste' },
+  { id:'assoc-dorv-27', articleId:'dorv-review', section:'Imagen', prompt:'Medición invasiva directa de la presión de arteria pulmonar y del ventrículo derecho en doble salida ventricular', answer:'Se obtiene con cateterismo cardiaco' },
+  { id:'assoc-dorv-28', articleId:'dorv-review', section:'Imagen', prompt:'Resonancia magnética cardiaca en lactantes y niños pequeños con doble salida ventricular', answer:'Se usa más como seguimiento repetible que como planeación quirúrgica inicial: requiere anestesia general y las coronarias no siempre se ven bien a esta edad' },
+  { id:'assoc-dorv-29', articleId:'dorv-review', section:'Imagen', prompt:'Doble salida de ambos ventrículos (DOBV)', answer:'Se identifica bien con ecocardiografía bidimensional simple, tanto en la evaluación inicial como en el seguimiento' },
+  { id:'assoc-dorv-30', articleId:'dorv-review', section:'Tratamiento', prompt:'Técnica quirúrgica asociada a buenos resultados tempranos y a mediano plazo en DOBV', answer:'Técnica de dos parches (two-patch technique)' },
+  { id:'assoc-dorv-31', articleId:'dorv-review', section:'Tratamiento', prompt:'Reparación biventricular de DOLV realizada en la infancia (no en la adultez)', answer:'No incrementa el riesgo quirúrgico según estudios pequeños, aunque falta seguimiento a largo plazo' },
+  { id:'assoc-dorv-32', articleId:'dorv-review', section:'Perlas clínicas', prompt:'Error frecuente: asumir que el término \'CIV\' en doble salida ventricular es la comunicación anatómica completa entre ventrículos', answer:'En realidad describe solo la vía de salida que el cirujano deja abierta; cerrar la comunicación real ocluiría por completo la salida del VI' },
+  { id:'assoc-dorv-33', articleId:'dorv-review', section:'Perlas clínicas', prompt:'Error frecuente: exigir infundíbulo bilateral para diagnosticar DORV', answer:'Ya no es criterio necesario según STS/EACTS -- solo 23% de los especímenes revisados lo tenía' },
+  { id:'assoc-dorv-34', articleId:'dorv-review', section:'Perlas clínicas', prompt:'Por qué distinguir DORV-CIV subaórtica simple de DORV tipo Fallot es clínicamente relevante', answer:'Porque los resultados quirúrgicos varían significativamente entre ambos, aunque la CIV esté en la misma posición subaórtica' },
+  { id:'assoc-dorv-35', articleId:'dorv-review', section:'Perlas clínicas', prompt:'Hasta antes de 1962, la doble salida del ventrículo izquierdo se consideraba', answer:'Embriológicamente imposible' },
+  { id:'assoc-dorv-36', articleId:'dorv-review', section:'Clasificación', prompt:'Neufeld (1961), tipo II supracristal con CIV subpulmonar', answer:'Corresponde a lo que hoy se conoce como corazón de Taussig-Bing' },
+  { id:'assoc-dorv-37', articleId:'dorv-review', section:'Clasificación', prompt:'Clasificación de DORV más utilizada en la actualidad', answer:'La de Lev y colaboradores (1972), según la relación de la CIV con las grandes arterias' },
+  { id:'assoc-dorv-38', articleId:'dorv-review', section:'Clasificación', prompt:'Van Praagh y colaboradores clasificaron la doble salida del ventrículo izquierdo según', answer:'La presencia de dos ventrículos bien desarrollados y la localización de la CIV respecto a las grandes arterias' },
 ];
 
 /* ------------------------------------------------------------------
@@ -2985,6 +3041,26 @@ function ankiFace(q, cls){
   </div>`;
 }
 
+/* Tarjeta de asociación clínica: toca para voltear (reusa el mecanismo
+   toggle-flip/S.reviewFlipped, ya existía en el dispatcher pero sin
+   ningún consumidor real hasta esta pestaña). */
+function assocCardHtml(c){
+  const flipped = S.reviewFlipped.has(c.id);
+  return `<button class="ankicard-wrap" data-action="toggle-flip" data-id="${esc(c.id)}">
+    <div class="ankicard small ${flipped?'flipped':''}">
+      <div class="ankicard-inner">
+        <div class="ankicard-face front">
+          <span class="ankicard-tag">${esc(c.section)}</span>
+          <div class="ankicard-text">${esc(c.prompt)}</div>
+        </div>
+        <div class="ankicard-face back">
+          <div class="ankicard-answer">${esc(c.answer)}</div>
+        </div>
+      </div>
+    </div>
+  </button>`;
+}
+
 function dueLabel(card){
   const days = Math.ceil((card.due - Date.now())/86400000);
   if(days <= 0) return 'Pendiente hoy';
@@ -3036,17 +3112,22 @@ function screenReview(){
     <div class="tab-row">
       <button class="tab-btn ${tab==='questions'?'active':''}" data-action="review-tab" data-tab="questions">Preguntas</button>
       <button class="tab-btn ${tab==='all'?'active':''}" data-action="review-tab" data-tab="all">Todas</button>
+      <button class="tab-btn ${tab==='asociacion'?'active':''}" data-action="review-tab" data-tab="asociacion">Asociación</button>
       <button class="tab-btn ${tab==='codex'?'active':''}" data-action="review-tab" data-tab="codex">Codex</button>
     </div>`;
 
-  const body = tab === 'codex' ? codexBodyHtml() : tab === 'all' ? allQuestionsBodyHtml() : questionsBodyHtml();
+  const body = tab === 'codex' ? codexBodyHtml() : tab === 'all' ? allQuestionsBodyHtml() : tab === 'asociacion' ? associationCardsBodyHtml() : questionsBodyHtml();
   const heading = tab === 'all'
     ? `${QUESTIONS.length} pregunta${QUESTIONS.length===1?'':'s'} en el banco`
+    : tab === 'asociacion'
+    ? `${ASSOCIATION_CARDS.length} tarjeta${ASSOCIATION_CARDS.length===1?'':'s'} de asociación`
     : `${stats.total} tarjeta${stats.total===1?'':'s'} guardadas`;
   const lede = tab === 'codex'
     ? 'El Codex mide tu dominio real por concepto: no cuántas preguntas acertaste, sino qué tan consolidado está cada tema y cuándo te toca repasarlo.'
     : tab === 'all'
     ? 'El banco completo de preguntas creadas para cada artículo, las hayas jugado en batalla o no.'
+    : tab === 'asociacion'
+    ? 'Asociaciones clínicas contextualizadas (hallazgo → interpretación) extraídas de cada artículo. Alimentan el minijuego Doble Hélice. Toca una tarjeta para voltearla.'
     : 'Cada pregunta que contestas en batalla se guarda aquí para siempre, catalogada por el artículo del que salió. Toca cualquiera para ver su ficha completa.';
 
   return `
@@ -3119,10 +3200,38 @@ function allQuestionsBodyHtml(){
   return `<div class="section" style="margin-top:18px;">${groups}</div>`;
 }
 
+/* Tarjetas de asociación clínica, agrupadas por artículo y luego por
+   sección temática (Definiciones, Clasificación, Imagen...), en el
+   orden en que se autoraron -- ver cardioaventura-association-cards-standard
+   en memoria para el criterio de contenido. */
+function associationCardsBodyHtml(){
+  const groups = ARTICLES.map(art => {
+    const cards = ASSOCIATION_CARDS.filter(c => c.articleId === art.id);
+    if(!cards.length) return '';
+    const bySection = {};
+    cards.forEach(c => { (bySection[c.section] = bySection[c.section] || []).push(c); });
+    const sectionsHtml = Object.keys(bySection).map(sec => `
+      <div class="qgroup-sub" style="margin:12px 0 6px;">${esc(sec)} · ${bySection[sec].length}</div>
+      <div class="ankicard-grid">${bySection[sec].map(assocCardHtml).join('')}</div>
+    `).join('');
+    return `
+      <div class="qgroup">
+        <div class="qgroup-head">
+          <div>
+            <div class="qgroup-name">${esc(art.name)}</div>
+            <div class="qgroup-sub">${cards.length} tarjeta${cards.length===1?'':'s'} de asociación${art.id===CURRENT_ARTICLE?' · en estudio':''}</div>
+          </div>
+        </div>
+        ${sectionsHtml}
+      </div>`;
+  }).join('');
+  return `<div class="section" style="margin-top:18px;">${groups || '<p class="muted">Todavía no hay tarjetas de asociación generadas. Se crean junto con las preguntas al procesar un artículo nuevo.</p>'}</div>`;
+}
+
 function masteryBarHtml(mastery){
   const pct = Math.round(mastery*100);
   const cls = pct>=75?'full':pct>=45?'mid':'low';
-  return `<div class="coverage-bar codex-bar"><div class="coverage-fill ${cls}" style="width:${pct}%;"></div></div>`;
+  return `<div class="mini-bar codex-bar"><div class="mini-bar-fill ${cls}" style="width:${pct}%;"></div></div>`;
 }
 
 /* Fila compacta de concepto para el Codex: dominio, intentos, estado. */
@@ -3513,15 +3622,25 @@ const HELIX_SEC_PER_PAIR_MIN = 4;
 const HELIX_SEC_PER_PAIR_MAX = 20;
 const HELIX_MIN_MS = HELIX_SEC_PER_PAIR_MIN * HELIX_PAIR_COUNT * 1000;
 const HELIX_MAX_MS = HELIX_SEC_PER_PAIR_MAX * HELIX_PAIR_COUNT * 1000;
+function truncateText(s, max){
+  if(s.length <= max) return s;
+  const cut = s.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + '…';
+}
+/* Fuente de pares: las tarjetas de asociación por artículo (ver
+   ASSOCIATION_CARDS) más los pares generales antiguos (DIRECTED_PAIRS)
+   como respaldo/complemento -- ambos con la misma forma {id,prompt,answer}. */
 function buildHelixPairs(){
-  const pool = shuffle(DIRECTED_PAIRS);
+  const source = [...ASSOCIATION_CARDS, ...DIRECTED_PAIRS];
+  const pool = shuffle(source);
   const pairs = [];
   const seenAnswers = new Set();
   for(const p of pool){
     if(pairs.length >= HELIX_PAIR_COUNT) break;
     if(seenAnswers.has(p.answer)) continue; // evita dos pares con la misma respuesta corta
     seenAnswers.add(p.answer);
-    pairs.push({ id: p.id, prompt: p.prompt, answer: p.answer });
+    pairs.push({ id: p.id, prompt: truncateText(p.prompt, 70), answer: truncateText(p.answer, 60) });
   }
   return pairs;
 }
