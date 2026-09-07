@@ -2414,8 +2414,8 @@ function loadData(){
      3) Listo -- mientras SUPABASE_URL siga con "TU-PROYECTO", todo esto
         queda inerte (cloudConfigured() corta antes de intentar nada).
 ================================================================== */
-const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'TU-ANON-KEY';
+const SUPABASE_URL = 'https://eutkhpusieugdkclpxsb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1dGtocHVzaWV1Z2RrY2xweHNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3MzE0NDksImV4cCI6MjEwNDMwNzQ0OX0.aW3N3KvaqFGMEb7nHtkNnrdE-FgZklpvo6fxG25ZFRk';
 const SYNC_KEY = 'jorge-cardioaventura'; // cámbialo por algo único tuyo si quieres
 
 const cloudConfigured = () => !SUPABASE_URL.includes('TU-PROYECTO') && !SUPABASE_ANON_KEY.includes('TU-ANON-KEY');
@@ -2490,7 +2490,8 @@ if(!DATA.minigames.helix) DATA.minigames.helix = { plays:0, bestTimeMs:null };
 /* Migración aditiva de Rutina Diaria (hábitos, fusionada desde el diseño
    RUTINA4AM de Claude Design) -- igual que DATA.minigames, nunca toca
    deck/campaign/learning. */
-if(!DATA.habits) DATA.habits = { log:{}, weights:[], weightGoal:null, topics:[], todayFocusByDate:{} };
+if(!DATA.habits) DATA.habits = { log:{}, weights:[], weightGoal:null, topics:[], todayFocusByDate:{}, todosByDate:{} };
+if(!DATA.habits.todosByDate) DATA.habits.todosByDate = {};
 // Tarjetas propias tipo Anki (frente/reverso simple), creadas por el
 // jugador desde Rutina -- ver el "adaptador" customCardAsQuestion() más
 // abajo, que las hace pasar por preguntas normales para reusar tal cual
@@ -2559,7 +2560,7 @@ if(!DATA.campaign.articleTag || DATA.campaign.articleTag !== CURRENT_ARTICLE){
   saveData();
 }
 const S = { screen:'habits', habitsTab:'hoy', run:null, tempAvatar:{ name:'', classId:null }, reviewFlipped:new Set(), study:null, pendingConfirm:null, confidencePending:null, debug:false, helix:null, plat:null,
-  habitsUI:{ minutePickerFor:null, poppedKey:null, chargeBolt:0, topicInput:'', weightInput:'', goalInput:'', customFront:'', customBack:'' } };
+  habitsUI:{ minutePickerFor:null, poppedKey:null, chargeBolt:0, topicInput:'', weightInput:'', goalInput:'', customFront:'', customBack:'', todoInput:'' } };
 const PDF_MAX_PAGES = 20;
 const DEBUG = (function(){ try{ return /[?&]debug=1/.test(location.search); }catch(e){ return false; } })();
 
@@ -4267,7 +4268,40 @@ function resetHabitMonth(){
   saveData(); render();
 }
 function clearHabitHistory(){
-  DATA.habits = { log:{}, weights:[], weightGoal:null, topics:[], todayFocusByDate:{} };
+  DATA.habits = { log:{}, weights:[], weightGoal:null, topics:[], todayFocusByDate:{}, todosByDate:{} };
+  saveData(); render();
+}
+
+// Lista libre de pendientes del día -- distinta del "Protocolo de hoy" (los
+// 5 hábitos fijos): tareas que el usuario escribe él mismo, sin categoría ni
+// repetición programada. Se guarda por fecha (mismo patrón que DATA.habits.log)
+// así que cada día nuevo arranca con una lista vacía sin necesidad de un
+// reset explícito -- los días anteriores quedan en el objeto pero no se
+// muestran en ningún lado todavía (espacio para un futuro historial).
+function todosForToday(){
+  const today = habitDateStr(new Date());
+  return DATA.habits.todosByDate[today] || [];
+}
+function addHabitTodo(){
+  const text = S.habitsUI.todoInput.trim();
+  if(!text) return;
+  const today = habitDateStr(new Date());
+  const list = todosForToday();
+  const todo = { id:'td'+Date.now(), text, done:false };
+  DATA.habits.todosByDate = { ...DATA.habits.todosByDate, [today]: [...list, todo] };
+  S.habitsUI.todoInput = '';
+  saveData(); render();
+}
+function toggleHabitTodo(id){
+  const today = habitDateStr(new Date());
+  const list = todosForToday().map(t => t.id === id ? { ...t, done: !t.done } : t);
+  DATA.habits.todosByDate = { ...DATA.habits.todosByDate, [today]: list };
+  saveData(); render();
+}
+function removeHabitTodo(id){
+  const today = habitDateStr(new Date());
+  const list = todosForToday().filter(t => t.id !== id);
+  DATA.habits.todosByDate = { ...DATA.habits.todosByDate, [today]: list };
   saveData(); render();
 }
 
@@ -4424,6 +4458,16 @@ function screenHabits(entering){
     </div>`).join('');
 
   const habitRows = HABITS_LIST.map((h,idx) => habitRowHtml(h, idx, todayEntry, entering)).join('');
+
+  const todayTodos = todosForToday();
+  const todoRows = todayTodos.length ? todayTodos.map(t => `
+    <div class="topic-row">
+      <div class="topic-check ${t.done?'done':''}" data-action="habit-todo-toggle" data-id="${esc(t.id)}"></div>
+      <div style="flex:1; min-width:0; cursor:pointer;" data-action="habit-todo-toggle" data-id="${esc(t.id)}">
+        <div style="font-size:13.5px; ${t.done?'text-decoration:line-through; color:var(--ink-muted);':''}">${esc(t.text)}</div>
+      </div>
+      <button class="topic-remove" data-action="habit-todo-remove" data-id="${esc(t.id)}">×</button>
+    </div>`).join('') : '<p class="muted" style="font-size:12.5px; margin:0;">Sin pendientes por ahora.</p>';
 
   const weights = DATA.habits.weights;
   const weightCurrent = weights.length ? weights[weights.length-1].kg.toFixed(1)+' kg' : '—';
@@ -4582,6 +4626,15 @@ function screenHabits(entering){
       <div class="eyebrow" style="margin:0 0 8px;">Protocolo de hoy</div>
       ${habitRows}
       <div class="muted" style="font-family:var(--mono); font-size:11px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border);">Estudio · semana ${(studyWeekMin/60).toFixed(1)}h · mes ${(studyMonthMin/60).toFixed(1)}h · año ${(studyYearMin/60).toFixed(1)}h</div>
+    </div>
+
+    <div class="card-panel" style="margin-bottom:14px;">
+      <div class="eyebrow" style="margin:0 0 8px;">Tareas de hoy</div>
+      <div class="btn-row" style="gap:8px; margin-bottom:${todayTodos.length?'10px':'0'};">
+        <input class="name-input" id="habitTodoInput" placeholder="Agregar pendiente" style="flex:1;" value="${esc(S.habitsUI.todoInput)}">
+        <button class="btn btn-primary" data-action="habit-add-todo">+</button>
+      </div>
+      ${todoRows}
     </div>`;
 
   const estudioBody = `
@@ -5470,6 +5523,12 @@ document.addEventListener('click', (e) => {
     removeHabitTopic(el.dataset.id);
   } else if(action === 'habit-focus-reviewed'){
     markHabitFocusReviewed();
+  } else if(action === 'habit-add-todo'){
+    addHabitTodo();
+  } else if(action === 'habit-todo-toggle'){
+    toggleHabitTodo(el.dataset.id);
+  } else if(action === 'habit-todo-remove'){
+    removeHabitTodo(el.dataset.id);
   } else if(action === 'habit-save-weight'){
     saveHabitWeight();
   } else if(action === 'habit-save-goal'){
@@ -5484,6 +5543,8 @@ document.addEventListener('keydown', (e) => {
   if(e.target && e.target.id === 'nameInput' && e.key === 'Enter'){
     const btn = document.querySelector('[data-action="confirm-avatar"]');
     if(btn && !btn.disabled) btn.click();
+  } else if(e.target && e.target.id === 'habitTodoInput' && e.key === 'Enter'){
+    addHabitTodo();
   }
 });
 document.addEventListener('input', (e) => {
@@ -5493,6 +5554,8 @@ document.addEventListener('input', (e) => {
     if(btn) btn.disabled = !(S.tempAvatar.name.trim().length>0 && S.tempAvatar.classId);
   } else if(e.target && e.target.id === 'habitTopicInput'){
     S.habitsUI.topicInput = e.target.value;
+  } else if(e.target && e.target.id === 'habitTodoInput'){
+    S.habitsUI.todoInput = e.target.value;
   } else if(e.target && e.target.id === 'habitWeightInput'){
     S.habitsUI.weightInput = e.target.value;
   } else if(e.target && e.target.id === 'habitGoalInput'){
