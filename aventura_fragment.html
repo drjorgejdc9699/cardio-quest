@@ -1029,6 +1029,18 @@ body,body.habits-theme{padding-top:env(safe-area-inset-top,0px)}
 .rayos-tier img{width:100%;height:100%;object-fit:cover;filter:grayscale(1) brightness(.35);display:block}
 .rayos-tier.on{border-color:var(--gold);box-shadow:0 0 6px rgba(255,201,74,.5)}
 .rayos-tier.on img{filter:none}
+
+/* Estudio -- calendario del programa + lector de PDF */
+.estudio-week{margin-bottom:14px}
+.estudio-week p{margin:6px 0 0;font-size:13.5px}
+.estudio-drop{text-align:center;margin-bottom:14px}
+.estudio-reader{margin-bottom:14px;padding:14px}
+.estudio-reader-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.estudio-filename{font-size:12.5px;color:var(--ink-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.estudio-canvas-wrap{width:100%;overflow:auto;background:#0A0A0D;border-radius:10px;display:flex;justify-content:center}
+.estudio-canvas-wrap canvas{max-width:100%;display:block}
+.estudio-pager{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
+.estudio-drive{opacity:.75}
 </style>
 
 <div class="arena">
@@ -1044,7 +1056,7 @@ body,body.habits-theme{padding-top:env(safe-area-inset-top,0px)}
 /* Se sube en cada publicación (ver checkForFreshBuild más abajo) -- así el
    propio archivo puede detectar si el que tiene abierto el celular quedó
    desactualizado frente al que vive en GitHub Pages. */
-const BUILD_ID = '2026-09-07T20:30-rayos-art';
+const BUILD_ID = '2026-09-07T21:10-estudio2';
 /* ------------------------------------------------------------------
    BANCO DE PREGUNTAS
    Para agregar preguntas propias: añade un objeto al arreglo QUESTIONS
@@ -1959,6 +1971,91 @@ function rayosGoCollection(){
   render();
 }
 
+/* ==================================================================
+   ESTUDIO -- calendario del programa académico + lector de PDF.
+   El calendario es solo informativo (semana actual del programa real,
+   intercalando tema nuevo + repaso dirigido, acordado con el usuario);
+   el lector funciona con CUALQUIER PDF, conectado a Drive o no.
+================================================================== */
+const STUDY_PROGRAM = [
+  { date:'2026-09-08', current:'Miocarditis', review:'Embriología cardiovascular' },
+  { date:'2026-09-10', current:'Miocardiopatía hipertrófica', review:'Anatomía y anatomopatología' },
+  { date:'2026-09-17', current:'Miocardiopatía dilatada', review:'Fisiología cardiovascular' },
+  { date:'2026-09-22', current:'Miocardiopatía restrictiva', review:'Exploración física cardiovascular' },
+  { date:'2026-09-24', current:'Displasia arritmogénica VD', review:'Electrofisiología cardiaca' },
+  { date:'2026-09-29', current:'Ventrículo izquierdo no compacto', review:'Farmacología cardiovascular' },
+  { date:'2026-10-01', current:'Enfermedades autoinmunes y cardiorrenal', review:'Imagen cardiovascular' },
+  { date:'2026-10-06', current:'Enfermedad de Takayasu', review:'Cardiología intervencionista' },
+  { date:'2026-10-08', current:'Tumores cardiacos', review:'Epidemiología y genética' },
+  { date:'2026-10-13', current:'Cirugía cardiovascular I', review:'Cardiopatías congénitas · Bloque A' },
+  { date:'2026-10-15', current:'Cirugía cardiovascular II', review:'Cardiopatías congénitas · Bloque B' },
+  { date:'2026-10-20', current:'Cirugía cardiovascular III', review:'Cardiopatías congénitas · Bloque C' },
+  { date:'2026-10-22', current:'Hipertensión pulmonar', review:'Cardiopatías congénitas · Bloque D' },
+  { date:'2026-11-05', current:'Cardiología fetal y neonatal', review:'Embriología cardiovascular (2ª vuelta)' },
+  { date:'2026-11-10', current:'Transición del paciente I', review:'Anatomía y anatomopatología' },
+  { date:'2026-11-12', current:'Transición del paciente II', review:'Fisiología cardiovascular' },
+  { date:'2026-11-17', current:'Transición del paciente III', review:'Exploración física cardiovascular' },
+  { date:'2026-11-24', current:null, review:'Electrofisiología cardiaca + Farmacología cardiovascular' },
+  { date:'2026-12-01', current:null, review:'Imagen cardiovascular + Cardiología intervencionista' },
+  { date:'2026-12-08', current:null, review:'Epidemiología/genética + Cardiopatías congénitas Bloque A' },
+  { date:'2026-12-15', current:null, review:'Cardiopatías congénitas Bloque B + Bloque C' },
+  { date:'2026-12-22', current:null, review:'Cardiopatías congénitas Bloque D + repaso Cardiopatías Adquiridas' },
+  { date:'2026-12-29', current:null, review:'Repaso integrador de todo el año' },
+];
+function currentStudyWeek(){
+  const today = habitDateStr(new Date());
+  let match = null;
+  for(const w of STUDY_PROGRAM){ if(w.date <= today) match = w; else break; }
+  return match || STUDY_PROGRAM[0];
+}
+if(typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+let estudioPdfDoc = null;
+async function estudioLoadPdf(file){
+  S.estudio = { status:'loading', fileName: file.name, pageNum:1, numPages:0 };
+  render();
+  try{
+    const buf = await file.arrayBuffer();
+    estudioPdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+    S.estudio = { status:'ready', fileName: file.name, pageNum:1, numPages: estudioPdfDoc.numPages };
+    render();
+    await estudioRenderPage(1);
+  }catch(e){
+    S.estudio = { status:'error', fileName: file.name };
+    render();
+  }
+}
+async function estudioRenderPage(num){
+  if(!estudioPdfDoc) return;
+  const page = await estudioPdfDoc.getPage(num);
+  const canvas = qs('estudioCanvas');
+  if(!canvas) return;
+  const containerWidth = canvas.parentElement.clientWidth;
+  const baseViewport = page.getViewport({ scale:1 });
+  const scale = containerWidth / baseViewport.width;
+  const viewport = page.getViewport({ scale });
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = viewport.width * dpr;
+  canvas.height = viewport.height * dpr;
+  canvas.style.width = viewport.width + 'px';
+  canvas.style.height = viewport.height + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+}
+function estudioGoPage(delta){
+  if(!S.estudio || S.estudio.status !== 'ready') return;
+  const next = S.estudio.pageNum + delta;
+  if(next < 1 || next > S.estudio.numPages) return;
+  S.estudio.pageNum = next;
+  render();
+  estudioRenderPage(next);
+}
+function estudioClosePdf(){
+  estudioPdfDoc = null;
+  S.estudio = null;
+  render();
+}
+
 /* ------------------------------------------------------------------
    ARQUETIPOS DE AVATAR (estilo entrenador, sin tema médico)
 ------------------------------------------------------------------- */
@@ -2833,7 +2930,8 @@ if(!DATA.campaign.articleTag || DATA.campaign.articleTag !== CURRENT_ARTICLE){
 }
 const S = { screen:'habits', habitsTab:'hoy', run:null, tempAvatar:{ name:'', classId:null }, reviewFlipped:new Set(), study:null, pendingConfirm:null, confidencePending:null, debug:false, helix:null, plat:null,
   habitsUI:{ minutePickerFor:null, poppedKey:null, chargeBolt:0, topicInput:'', weightInput:'', goalInput:'', customFront:'', customBack:'', todoInput:'' },
-  rayos:null };
+  rayos:null,
+  estudio:null };
 const PDF_MAX_PAGES = 20;
 const DEBUG = (function(){ try{ return /[?&]debug=1/.test(location.search); }catch(e){ return false; } })();
 
@@ -4359,6 +4457,49 @@ function screenRayos(){
     ${revealHtml}`;
 }
 
+function screenEstudio(){
+  const week = currentStudyWeek();
+  const e = S.estudio;
+  let reader = '';
+  if(!e){
+    reader = `<div class="card-panel estudio-drop">
+      <div class="eyebrow">TU LECTURA</div>
+      <p class="muted" style="margin:0 0 14px;">Abre cualquier PDF de tu teléfono para leerlo aquí mismo -- no tiene que ser justo el de esta semana.</p>
+      <input type="file" id="estudioFileInput" accept="application/pdf" hidden>
+      <button class="btn btn-primary btn-block" data-action="estudio-pick">${eIcon('file')} Abrir un PDF</button>
+    </div>`;
+  } else if(e.status === 'loading'){
+    reader = `<div class="card-panel" style="text-align:center;"><p class="muted">Abriendo ${esc(e.fileName)}…</p></div>`;
+  } else if(e.status === 'error'){
+    reader = `<div class="card-panel" style="text-align:center;">
+      <p class="muted">No se pudo abrir ${esc(e.fileName)}. ¿Seguro que es un PDF válido?</p>
+      <input type="file" id="estudioFileInput" accept="application/pdf" hidden>
+      <button class="btn" data-action="estudio-pick">Intentar con otro archivo</button>
+    </div>`;
+  } else {
+    reader = `<div class="card-panel estudio-reader">
+      <div class="estudio-reader-head"><span class="estudio-filename">${esc(e.fileName)}</span><button class="icon-btn" data-action="estudio-close" aria-label="Cerrar PDF">${eIcon('close')}</button></div>
+      <div class="estudio-canvas-wrap"><canvas id="estudioCanvas"></canvas></div>
+      <div class="estudio-pager">
+        <button class="btn" data-action="estudio-prev" ${e.pageNum<=1?'disabled':''}>‹ Anterior</button>
+        <span class="muted">Página ${e.pageNum} / ${e.numPages}</span>
+        <button class="btn" data-action="estudio-next" ${e.pageNum>=e.numPages?'disabled':''}>Siguiente ›</button>
+      </div>
+    </div>`;
+  }
+  return `
+    <div class="section"><div class="eyebrow">TU MATERIAL DE LECTURA</div><h1>Estudio</h1><p class="lede">El programa sugiere, tú decides qué leer.</p></div>
+    <div class="card-panel estudio-week">
+      <div class="eyebrow">SEMANA DEL PROGRAMA</div>
+      ${week.current?`<p><b>Tema actual:</b> ${esc(week.current)}</p>`:''}
+      <p><b>Repaso sugerido:</b> ${esc(week.review)}</p>
+    </div>
+    ${reader}
+    <div class="card-panel estudio-drive">
+      <div class="eyebrow">GOOGLE DRIVE</div>
+      <p class="muted" style="margin:0;">Próximamente: conecta la carpeta donde guardas tus resúmenes y ábrelos directo desde aquí, sin pasar por Drive.</p>
+    </div>`;
+}
 function screenHelix(){
   const h = S.helix;
   if(!h) return '';
@@ -5152,7 +5293,7 @@ function render(){
   // La Rutina 4AM tiene identidad visual propia (negro/rojo/dorado, ver
   // body.habits-theme en <style>) -- se activa/desactiva en un único lugar
   // central en vez de que cada screenX() tenga que acordarse de hacerlo.
-  document.body.classList.toggle('habits-theme', S.screen === 'habits' || S.screen === 'rayos');
+  document.body.classList.toggle('habits-theme', ['habits','rayos','estudio'].includes(S.screen));
   renderTopbar();
   const app = qs('app');
   let content = '';
@@ -5183,6 +5324,7 @@ function render(){
   else if(S.screen === 'platplay') content = screenPlatformerShell();
   else if(S.screen === 'habits') content = screenHabits(enteringHabits);
   else if(S.screen === 'rayos') content = screenRayos();
+  else if(S.screen === 'estudio') content = screenEstudio();
   app.innerHTML = content + confirmModalHtml();
   renderBottomNav();
   animateHabitNumbers();
@@ -5899,6 +6041,14 @@ document.addEventListener('click', (e) => {
   } else if(action === 'rayos-stop'){
     S.rayos = null;
     proNavigate('habits');
+  } else if(action === 'estudio-pick'){
+    qs('estudioFileInput').click();
+  } else if(action === 'estudio-prev'){
+    estudioGoPage(-1);
+  } else if(action === 'estudio-next'){
+    estudioGoPage(1);
+  } else if(action === 'estudio-close'){
+    estudioClosePdf();
   } else if(action === 'habit-save-weight'){
     saveHabitWeight();
   } else if(action === 'habit-save-goal'){
@@ -5944,6 +6094,9 @@ document.addEventListener('change', (e) => {
   if(e.target && e.target.id === 'pdfFileInput'){
     const file = e.target.files && e.target.files[0];
     if(file) handlePdfFile(file);
+  } else if(e.target && e.target.id === 'estudioFileInput'){
+    const file = e.target.files && e.target.files[0];
+    if(file) estudioLoadPdf(file);
   } else if(e.target && e.target.id === 'habitFocusSelect'){
     setHabitFocus(e.target.value);
   } else if(e.target && e.target.id === 'importBackupInput'){
@@ -6164,9 +6317,9 @@ renderTopbar=function(){
 };
 renderBottomNav=function(){
  if(S.screen==='platplay'){qs('bottomnav').innerHTML='';return}
- const group=['habits','rayos'].includes(S.screen)?'habits':['review','study','card','concept'].includes(S.screen)?'review':['games','helix','platselect'].includes(S.screen)?'games':'home';
+ const group=['habits','rayos'].includes(S.screen)?'habits':['review','study','card','concept'].includes(S.screen)?'review':['games','helix','platselect','splash','home','avatar','map','battle','debug'].includes(S.screen)?'games':S.screen==='estudio'?'estudio':'habits';
  const due=deckStats().due;
- qs('bottomnav').innerHTML=`<nav class="bottomnav" aria-label="Navegación principal">${[['habits','◷','Mi día'],['home','⚑','Aventura'],['review','▤','Repaso'],['games','♧','Minijuegos']].map(([id,icon,label])=>`<button class="bottomnav-btn ${group===id?'active':''}" data-pro="navigate" data-dest="${id}" ${group===id?'aria-current="page"':''}><span class="bottomnav-icon" aria-hidden="true">${icon}</span><span>${label}${id==='review'&&due?`<span class="nav-badge">${due}</span>`:''}</span></button>`).join('')}</nav>`;
+ qs('bottomnav').innerHTML=`<nav class="bottomnav" aria-label="Navegación principal">${[['habits','◷','Mi día'],['review','▤','Repaso'],['games','♧','Jugar'],['estudio','▥','Estudio']].map(([id,icon,label])=>`<button class="bottomnav-btn ${group===id?'active':''}" data-pro="navigate" data-dest="${id}" ${group===id?'aria-current="page"':''}><span class="bottomnav-icon" aria-hidden="true">${icon}</span><span>${label}${id==='review'&&due?`<span class="nav-badge">${due}</span>`:''}</span></button>`).join('')}</nav>`;
  qs('app').style.paddingBottom='110px';
 };
 screenHome=function(){
@@ -6186,7 +6339,7 @@ screenHabits=function(entering){
  if(start>=0&&end>start){html=html.slice(0,start)+`<section class="today-intro"><div><div class="eyebrow">TU RUTINA, A TU RITMO</div><h1>${DATA.avatar?'Hola, '+esc(DATA.avatar.name)+'.':'Hoy también cuenta.'}</h1><p>Pequeños hábitos. Aprendizaje constante.</p></div><img src="${HABIT_IMAGES.study}" alt="Ilustración de estudio"></section>`+html.slice(end)}
  return html.replace('Protocolo de hoy','Tus hábitos de hoy').replace('Carga diaria','Tu avance de hoy').replace('Sin iniciar','Todo listo para empezar').replace('Hola, Jorge.','Hoy también cuenta.');
 };
-function screenGames(){return `<div class="section"><div class="eyebrow">UN CAMBIO DE RITMO</div><h1>Aprender también se juega.</h1><p class="lede">Dos formas de tomar impulso entre sesiones de estudio.</p></div><div class="game-grid"><section class="card-panel game-tile"><img src="${HABIT_IMAGES.study}" alt=""><div class="eyebrow">ASOCIACIÓN CLÍNICA</div><h2>Doble Hélice</h2><p>Conecta hallazgos e interpretaciones. Encuentra las parejas y mejora tu tiempo.</p><button class="btn btn-primary" data-action="go-helix">Jugar Doble Hélice →</button></section><section class="card-panel game-tile"><img src="${WORLD_MAP_IMAGE}" alt=""><div class="eyebrow">PLATAFORMAS</div><h2>Corazón Bros</h2><p>Salta, explora y supera los obstáculos de cada escenario.</p><button class="btn btn-primary" data-action="go-platselect">Elegir escenario →</button></section></div>`}
+function screenGames(){const cc=clearedCount();return `<div class="section"><div class="eyebrow">UN CAMBIO DE RITMO</div><h1>Aprender también se juega.</h1><p class="lede">Tres formas de tomar impulso entre sesiones de estudio.</p></div><div class="game-grid"><section class="card-panel game-tile"><img src="${WORLD_MAP_IMAGE}" alt=""><div class="eyebrow">CAMPAÑA · 10 RIVALES</div><h2>Cardioaventura</h2><p>${DATA.avatar?`${cc} rivales derrotados. Continúa tu recorrido.`:'Crea tu personaje y resuelve casos clínicos por el mapa.'}</p><button class="btn btn-primary" data-action="go-avatar-or-map">${DATA.avatar?'Continuar aventura':'Crear mi personaje'} →</button></section><section class="card-panel game-tile"><img src="${HABIT_IMAGES.study}" alt=""><div class="eyebrow">ASOCIACIÓN CLÍNICA</div><h2>Doble Hélice</h2><p>Conecta hallazgos e interpretaciones. Encuentra las parejas y mejora tu tiempo.</p><button class="btn btn-primary" data-action="go-helix">Jugar Doble Hélice →</button></section><section class="card-panel game-tile"><img src="${WORLD_MAP_IMAGE}" alt=""><div class="eyebrow">PLATAFORMAS</div><h2>Corazón Bros</h2><p>Salta, explora y supera los obstáculos de cada escenario.</p><button class="btn btn-primary" data-action="go-platselect">Elegir escenario →</button></section></div>`}
 let proSearch='';
 screenReview=function(){return proOldReview().replace(/(<div class="tab-row">)/,`<div class="search-wrap"><label for="reviewSearch" class="field-label">Buscar en esta pestaña</label><input class="name-input" id="reviewSearch" type="search" placeholder="Pregunta, concepto o palabra clave…" value="${esc(proSearch)}"></div>$1`)};
 function proFilter(){
@@ -6260,7 +6413,7 @@ const ELECTRIC_ART=HABIT_IMAGES.bannerHeader;
 function originalIcon(name,cls=''){return `<img class="original-icon ${cls}" src="${HABIT_IMAGES[name]}" alt="" decoding="async">`}
 const BOLT_PATH='M14 2 5 13h6l-1 9L20 9h-7z';
 function eIcon(name,extra=''){
- const shapes={bolt:`<path class="bolt-fill" d="${BOLT_PATH}"/>`,check:'<path d="m5 12 4 4L19 6"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',activity:'<path d="M2 12h4l3-8 5 16 3-8h5"/>',book:'<path d="M12 5v16M3 4c4-1 6 0 9 2 3-2 5-3 9-2v15c-4-1-6 0-9 2-3-2-5-3-9-2Z"/>',moon:'<path d="M20 15A8.5 8.5 0 0 1 9 4a8.5 8.5 0 1 0 11 11Z"/>',meal:'<path d="M5 3v6c0 3 4 3 4 0V3M7 3v19M18 3c-4 4-4 9 0 9V3v19"/>',flag:'<path d="M5 22V3m0 1c5-4 9 4 14 0v11c-5 4-9-4-14 0"/>',game:'<path d="M7 6h10c3 0 5 10 4 12-1 2-4-1-5-3H8c-1 2-4 5-5 3-1-2 1-12 4-12Z"/><path d="M7 8v5m-2.5-2.5h5M16 10h.1M18 12h.1"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',plus:'<path d="M12 5v14M5 12h14"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/>'};
+ const shapes={bolt:`<path class="bolt-fill" d="${BOLT_PATH}"/>`,check:'<path d="m5 12 4 4L19 6"/>',sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',activity:'<path d="M2 12h4l3-8 5 16 3-8h5"/>',book:'<path d="M12 5v16M3 4c4-1 6 0 9 2 3-2 5-3 9-2v15c-4-1-6 0-9 2-3-2-5-3-9-2Z"/>',moon:'<path d="M20 15A8.5 8.5 0 0 1 9 4a8.5 8.5 0 1 0 11 11Z"/>',meal:'<path d="M5 3v6c0 3 4 3 4 0V3M7 3v19M18 3c-4 4-4 9 0 9V3v19"/>',flag:'<path d="M5 22V3m0 1c5-4 9 4 14 0v11c-5 4-9-4-14 0"/>',game:'<path d="M7 6h10c3 0 5 10 4 12-1 2-4-1-5-3H8c-1 2-4 5-5 3-1-2 1-12 4-12Z"/><path d="M7 8v5m-2.5-2.5h5M16 10h.1M18 12h.1"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',plus:'<path d="M12 5v14M5 12h14"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',shield:'<path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/>',file:'<path d="M6 2h8l5 5v15H6Z"/><path d="M14 2v5h5M9 13h6M9 17h6"/>'};
  return `<svg class="ui-icon ${extra}" viewBox="0 0 24 24" aria-hidden="true">${shapes[name]||shapes.bolt}</svg>`;
 }
 let electricMotion='full';
@@ -6284,9 +6437,9 @@ renderTopbar=function(){
 };
 renderBottomNav=function(){
  if(S.screen==='platplay'){qs('bottomnav').innerHTML='';return}
- const group=['habits','rayos'].includes(S.screen)?'habits':['review','study','card','concept'].includes(S.screen)?'review':['games','helix','platselect'].includes(S.screen)?'games':'home';
+ const group=['habits','rayos'].includes(S.screen)?'habits':['review','study','card','concept'].includes(S.screen)?'review':['games','helix','platselect','splash','home','avatar','map','battle','debug'].includes(S.screen)?'games':S.screen==='estudio'?'estudio':'habits';
  const due=deckStats().due;
- qs('bottomnav').innerHTML=`<nav class="bottomnav" aria-label="Navegación principal">${[['habits','bolt','Mi día'],['home','flag','Aventura'],['review','book','Repaso'],['games','game','Jugar']].map(([id,icon,label])=>`<button class="bottomnav-btn ${group===id?'active':''}" data-pro="navigate" data-dest="${id}" ${group===id?'aria-current="page"':''}><span class="bottomnav-icon">${eIcon(icon)}</span><span>${label}${id==='review'&&due?`<span class="nav-badge">${due}</span>`:''}</span></button>`).join('')}</nav>`;
+ qs('bottomnav').innerHTML=`<nav class="bottomnav" aria-label="Navegación principal">${[['habits','bolt','Mi día'],['review','book','Repaso'],['games','game','Jugar'],['estudio','file','Estudio']].map(([id,icon,label])=>`<button class="bottomnav-btn ${group===id?'active':''}" data-pro="navigate" data-dest="${id}" ${group===id?'aria-current="page"':''}><span class="bottomnav-icon">${eIcon(icon)}</span><span>${label}${id==='review'&&due?`<span class="nav-badge">${due}</span>`:''}</span></button>`).join('')}</nav>`;
  qs('app').style.paddingBottom='110px';
 };
 function electricTabs(){return `<div class="tab-row" aria-label="Secciones de rutina">${[['hoy','Hoy'],['estudio','Estudio'],['progreso','Progreso'],['ajustes','Ajustes']].map(([id,label])=>`<button class="tab-btn ${S.habitsTab===id?'active':''}" data-action="habits-tab" data-tab="${id}" aria-pressed="${S.habitsTab===id}">${label}</button>`).join('')}</div>`}
