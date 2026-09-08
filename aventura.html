@@ -1002,6 +1002,16 @@ h1,h2,h3{font-weight:750}.eyebrow{font-family:var(--sans);font-size:10px;letter-
 .night-hero::after{display:none}.night-hero-copy{padding:25px}.night-hero h1{font-size:30px;letter-spacing:-.8px}.night-hero p{margin-top:12px}.night-hero .eyebrow{font-size:8px;line-height:1.7}.hero-meta{margin-top:17px;font-size:9px}
 @media(min-width:900px){.night-hero{min-height:0}}
 @media(max-width:600px){.electric-mark{width:40px;height:40px}.habit-symbol,.electric-habit.done .habit-symbol{width:48px;height:48px;border-radius:11px}.electric-habit{min-height:80px}.night-hero{display:block;padding:0;min-height:0}.night-hero-copy{padding:20px 22px}.night-hero h1{font-size:27px;max-width:none}.night-hero p{max-width:none;margin-top:10px}.night-hero p br{display:none}.night-hero .hero-meta{margin-top:12px;font-size:8px}.energy-original{width:32px;height:28px}.energy-eyebrow{gap:8px}}
+
+/* Safe-area para la PWA instalada en iPhone: apple-mobile-web-app-status-bar-style
+   es "black-translucent" a propósito (para que el fondo oscuro llegue hasta arriba
+   de la pantalla), pero eso significa que el contenido dibuja DEBAJO de la barra de
+   estado/Isla Dinámica salvo que se le sume su alto manualmente. Va en <body> (no en
+   .topbar) para que gane sin pelear con los `padding:Npx 0` de .topbar repetidos en
+   cada breakpoint/capa -- padding-top es una propiedad aparte de padding-inline, así
+   que ninguna de esas reglas la pisa. env() resuelve a 0 en cualquier pantalla sin
+   recorte (desktop, Android, iPhone sin notch), así que es seguro dejarla siempre activa. */
+body,body.habits-theme{padding-top:env(safe-area-inset-top,0px)}
 </style>
 
 <div class="arena">
@@ -1017,7 +1027,7 @@ h1,h2,h3{font-weight:750}.eyebrow{font-family:var(--sans);font-size:10px;letter-
 /* Se sube en cada publicación (ver checkForFreshBuild más abajo) -- así el
    propio archivo puede detectar si el que tiene abierto el celular quedó
    desactualizado frente al que vive en GitHub Pages. */
-const BUILD_ID = '2026-09-07T02:15-02';
+const BUILD_ID = '2026-09-07T02:40-safearea';
 /* ------------------------------------------------------------------
    BANCO DE PREGUNTAS
    Para agregar preguntas propias: añade un objeto al arreglo QUESTIONS
